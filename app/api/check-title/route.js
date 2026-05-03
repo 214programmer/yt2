@@ -10,10 +10,6 @@ export async function POST(request) {
       return Response.json({ error: "Неверный код доступа." }, { status: 401 });
     }
 
-    if (!title) {
-      return Response.json({ error: "Введите заголовок" }, { status: 400 });
-    }
-
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -25,11 +21,20 @@ export async function POST(request) {
         messages: [
           {
             role: "system",
-            content: "Ты — эксперт по YouTube. Оцени заголовок и предложи 7 КРУТЫХ альтернатив. Отвечай СТРОГО в формате JSON на русском языке."
+            content: "Ты — топовый YouTube-стратег. Твоя задача — провести глубокий аудит заголовка. Отвечай СТРОГО в формате JSON на русском языке."
           },
           {
             role: "user",
-            content: `Оцени заголовок: "${title}". Верни JSON: {"score": число, "analysis": "текст", "pros": ["пункт1"], "cons": ["пункт1"], "improvements": ["вариант1", "вариант2", "вариант3", "вариант4", "вариант5", "вариант6", "вариант7"]}`
+            content: `Проанализируй заголовок: "${title}". 
+            Дай ответ в JSON: 
+            {
+              "score": число 0-100, 
+              "analysis": "подробный разбор почему заголовок работает или нет", 
+              "psychology": "какие триггеры (любопытство, страх, выгода) задействованы",
+              "pros": ["детальный плюс 1", "детальный плюс 2"], 
+              "cons": ["детальный минус 1", "детальный минус 2"], 
+              "improvements": ["Вариант 1 (Хайповый)", "Вариант 2 (SEO)", "Вариант 3 (Вопрос)", "Вариант 4 (Интрига)", "Вариант 5 (Список)", "Вариант 6 (Эмоциональный)", "Вариант 7 (Короткий)", "Вариант 8 (Для Shorts)", "Вариант 9 (С цифрами)", "Вариант 10 (Провокация)"]
+            }`
           }
         ],
         response_format: { type: "json_object" },
@@ -37,10 +42,8 @@ export async function POST(request) {
     });
 
     const data = await response.json();
-    const content = JSON.parse(data.choices[0].message.content);
-    return Response.json(content);
-
+    return Response.json(JSON.parse(data.choices[0].message.content));
   } catch (error) {
-    return Response.json({ error: "Ошибка сервера или нейросети." }, { status: 500 });
+    return Response.json({ error: "Ошибка нейросети. Проверьте ключ Groq." }, { status: 500 });
   }
 }
