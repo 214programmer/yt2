@@ -75,6 +75,11 @@ export default function HomePage() {
   const [planLoading, setPlanLoading] = useState(false);
   const [planError, setPlanError] = useState("");
 
+  // --- Переменные для Title Lab ---
+  const [testTitle, setTestTitle] = useState("");
+  const [titleResult, setTitleResult] = useState(null);
+  const [titleLoading, setTitleLoading] = useState(false);
+
   async function handleSubmit(event) {
     event.preventDefault();
     const accessCode = window.prompt("Введите код доступа от администратора");
@@ -150,6 +155,27 @@ export default function HomePage() {
       setPlanError(detailsError.message || "Ошибка во время детализации плана.");
     } finally {
       setPlanLoading(false);
+    }
+  }
+
+  // --- Функция для Title Lab ---
+  async function handleCheckTitle(e) {
+    e.preventDefault();
+    if (!testTitle) return;
+    setTitleLoading(true);
+    setTitleResult(null);
+    try {
+      const res = await fetch("/api/check-title", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: testTitle }),
+      });
+      const data = await res.json();
+      if (res.ok) setTitleResult(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTitleLoading(false);
     }
   }
 
@@ -530,6 +556,58 @@ export default function HomePage() {
           </section>
         </>
       ) : null}
+
+      {/* --- БЛОК TITLE LAB (НОВОЕ) --- */}
+      <section className="panel" style={{ marginTop: '40px', border: '2px solid #ff7a50' }}>
+        <div className="section-head">
+          <div>
+            <span className="eyebrow" style={{ color: '#ff7a50' }}>Инструмент</span>
+            <h3>Title Lab — Симулятор заголовка</h3>
+          </div>
+          <p className="muted">Проверь свой заголовок на кликабельность и получи советы от AI перед публикацией.</p>
+        </div>
+
+        <form onSubmit={handleCheckTitle} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <input
+            type="text"
+            style={{ 
+              flex: 1, 
+              padding: '12px', 
+              borderRadius: '8px', 
+              border: '1px solid #ddd',
+              color: '#333' 
+            }}
+            placeholder="Введите ваш вариант заголовка..."
+            value={testTitle}
+            onChange={(e) => setTestTitle(e.target.value)}
+          />
+          <button className="primary-button" type="submit" disabled={titleLoading} style={{ margin: 0 }}>
+            {titleLoading ? "Анализ..." : "Оценить"}
+          </button>
+        </form>
+
+        {titleResult && (
+          <div className="details-panel" style={{ display: 'block', background: '#fff', borderRadius: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px', padding: '10px' }}>
+              <div style={{ 
+                fontSize: '48px', 
+                fontWeight: 'bold', 
+                color: titleResult.score > 70 ? '#22c55e' : '#f59e0b',
+                minWidth: '100px'
+              }}>
+                {titleResult.score}%
+              </div>
+              <p style={{ color: '#333' }}><strong>Вердикт:</strong> {titleResult.analysis}</p>
+            </div>
+            
+            <div className="list-grid">
+              <BulletList title="Плюсы" items={titleResult.pros} />
+              <BulletList title="Что плохо" items={titleResult.cons} />
+              <BulletList title="AI рекомендует варианты" items={titleResult.improvements} />
+            </div>
+          </div>
+        )}
+      </section>
     </main>
   );
 }
