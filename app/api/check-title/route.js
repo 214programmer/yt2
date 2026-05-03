@@ -1,8 +1,14 @@
+import { isValidAccessCode } from "@/lib/access-codes";
+
 export const runtime = "nodejs";
 
 export async function POST(request) {
   try {
-    const { title } = await request.json();
+    const { title, accessCode } = await request.json();
+
+    if (!isValidAccessCode(accessCode)) {
+      return Response.json({ error: "Неверный код доступа." }, { status: 401 });
+    }
 
     if (!title) {
       return Response.json({ error: "Введите заголовок" }, { status: 400 });
@@ -19,25 +25,22 @@ export async function POST(request) {
         messages: [
           {
             role: "system",
-            content: "Ты — эксперт по виральному контенту на YouTube. Твоя задача — проанализировать заголовок и предложить 7 КРУТЫХ, кликабельных альтернатив. Отвечай СТРОГО в формате JSON на русском языке."
+            content: "Ты — эксперт по YouTube. Оцени заголовок и предложи 7 КРУТЫХ альтернатив. Отвечай СТРОГО в формате JSON на русском языке."
           },
           {
             role: "user",
-            content: `Оцени заголовок: "${title}". Верни JSON: {"score": число, "analysis": "текст", "pros": ["пункт1", "пункт2"], "cons": ["пункт1", "пункт2"], "improvements": ["вариант1", "вариант2", "вариант3", "вариант4", "вариант5", "вариант6", "вариант7"]}`
+            content: `Оцени заголовок: "${title}". Верни JSON: {"score": число, "analysis": "текст", "pros": ["пункт1"], "cons": ["пункт1"], "improvements": ["вариант1", "вариант2", "вариант3", "вариант4", "вариант5", "вариант6", "вариант7"]}`
           }
         ],
         response_format: { type: "json_object" },
-        temperature: 0.8,
       }),
     });
 
     const data = await response.json();
-    if (!response.ok) throw new Error("Ошибка Groq API");
-
     const content = JSON.parse(data.choices[0].message.content);
     return Response.json(content);
 
   } catch (error) {
-    return Response.json({ error: "Ошибка нейросети. Проверьте соединение." }, { status: 500 });
+    return Response.json({ error: "Ошибка сервера или нейросети." }, { status: 500 });
   }
 }
