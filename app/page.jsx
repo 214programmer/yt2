@@ -75,7 +75,7 @@ export default function HomePage() {
   const [planLoading, setPlanLoading] = useState(false);
   const [planError, setPlanError] = useState("");
 
-  // --- Переменные для Title Lab ---
+  // Состояния для Title Lab
   const [testTitle, setTestTitle] = useState("");
   const [titleResult, setTitleResult] = useState(null);
   const [titleLoading, setTitleLoading] = useState(false);
@@ -158,7 +158,7 @@ export default function HomePage() {
     }
   }
 
-  // --- Функция для Title Lab ---
+  // Функция Title Lab
   async function handleCheckTitle(e) {
     e.preventDefault();
     if (!testTitle) return;
@@ -171,9 +171,10 @@ export default function HomePage() {
         body: JSON.stringify({ title: testTitle }),
       });
       const data = await res.json();
-      if (res.ok) setTitleResult(data);
+      if (!res.ok) throw new Error(data.error || "Ошибка запроса");
+      setTitleResult(data);
     } catch (err) {
-      console.error(err);
+      alert("Ошибка: " + err.message);
     } finally {
       setTitleLoading(false);
     }
@@ -233,13 +234,62 @@ export default function HomePage() {
             интерпретации, выводов и рекомендаций.
           </p>
         </form>
+
+        {/* --- НОВЫЙ БЛОК TITLE LAB (ТЕПЕРЬ ВВЕРХУ) --- */}
+        <div className="panel" style={{ marginTop: '30px', border: '2px solid #ff7a50', background: 'rgba(255,122,80,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <h3 style={{ margin: 0 }}>Title Lab — Симулятор заголовка</h3>
+            <span className="eyebrow" style={{ color: '#ff7a50', margin: 0 }}>ИНСТРУМЕНТ</span>
+          </div>
+          
+          <form onSubmit={handleCheckTitle} style={{ display: 'flex', gap: '10px' }}>
+            <input
+              type="text"
+              style={{ 
+                flex: 1, 
+                padding: '12px', 
+                borderRadius: '8px', 
+                border: '1px solid #ddd', 
+                color: '#333',
+                fontSize: '16px' 
+              }}
+              placeholder="Введите заголовок будущего видео..."
+              value={testTitle}
+              onChange={(e) => setTestTitle(e.target.value)}
+            />
+            <button className="primary-button" type="submit" disabled={titleLoading} style={{ margin: 0, minWidth: '120px' }}>
+              {titleLoading ? "..." : "Оценить"}
+            </button>
+          </form>
+
+          {titleResult && (
+            <div style={{ marginTop: '20px', padding: '20px', background: '#fff', borderRadius: '12px', color: '#333', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '15px' }}>
+                <div style={{ 
+                  fontSize: '42px', 
+                  fontWeight: 'bold', 
+                  color: titleResult.score > 70 ? '#22c55e' : '#f59e0b',
+                  minWidth: '90px'
+                }}>
+                  {titleResult.score}%
+                </div>
+                <p style={{ margin: 0 }}><strong>Вердикт AI:</strong> {titleResult.analysis}</p>
+              </div>
+              
+              <div className="list-grid" style={{ marginTop: '20px' }}>
+                <BulletList title="Что хорошо" items={titleResult.pros} />
+                <BulletList title="Что доработать" items={titleResult.cons} />
+                <BulletList title="Рекомендованные варианты" items={titleResult.improvements} />
+              </div>
+            </div>
+          )}
+        </div>
       </section>
 
       {error ? <div className="status-banner error">{error}</div> : null}
       {loading ? (
         <div className="status-banner">
-          Идет сбор данных канала, видео и конкурентных роликов. Затем они
-          отправятся в Groq для итогового аудита.
+          Идет сбор данных канала...
         </div>
       ) : null}
 
@@ -439,8 +489,7 @@ export default function HomePage() {
                 <h3>Что делать дальше</h3>
               </div>
               <p className="muted">
-                Канал был проанализирован {formatDate(result.analyzedAt)}. Ниже
-                готовый tactical roadmap, собранный AI по метрикам канала.
+                Ниже готовый tactical roadmap, собранный AI по метрикам канала.
               </p>
             </div>
             <div className="list-grid plan-grid">
@@ -457,9 +506,6 @@ export default function HomePage() {
                     ? "Повторить генерацию"
                     : "Узнать подробнее"}
               </button>
-              {planDetails ? (
-                <span className="muted">Подробный план обновлен {formatDate(planDetails.generatedAt)}</span>
-              ) : null}
             </div>
 
             {planError ? <div className="status-banner error compact">{planError}</div> : null}
@@ -505,11 +551,6 @@ export default function HomePage() {
                 <span className="eyebrow">Аудит всех видео</span>
                 <h3>Подробная разбивка по роликам</h3>
               </div>
-              <p className="muted">
-                {coverage.isCapped
-                  ? `Показаны последние ${coverage.maxVideos} видео из ${coverage.totalPublicVideos}.`
-                  : "Показаны все найденные публичные видео канала."}
-              </p>
             </div>
 
             <div className="table-wrap">
@@ -556,58 +597,6 @@ export default function HomePage() {
           </section>
         </>
       ) : null}
-
-      {/* --- БЛОК TITLE LAB (НОВОЕ) --- */}
-      <section className="panel" style={{ marginTop: '40px', border: '2px solid #ff7a50' }}>
-        <div className="section-head">
-          <div>
-            <span className="eyebrow" style={{ color: '#ff7a50' }}>Инструмент</span>
-            <h3>Title Lab — Симулятор заголовка</h3>
-          </div>
-          <p className="muted">Проверь свой заголовок на кликабельность и получи советы от AI перед публикацией.</p>
-        </div>
-
-        <form onSubmit={handleCheckTitle} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-          <input
-            type="text"
-            style={{ 
-              flex: 1, 
-              padding: '12px', 
-              borderRadius: '8px', 
-              border: '1px solid #ddd',
-              color: '#333' 
-            }}
-            placeholder="Введите ваш вариант заголовка..."
-            value={testTitle}
-            onChange={(e) => setTestTitle(e.target.value)}
-          />
-          <button className="primary-button" type="submit" disabled={titleLoading} style={{ margin: 0 }}>
-            {titleLoading ? "Анализ..." : "Оценить"}
-          </button>
-        </form>
-
-        {titleResult && (
-          <div className="details-panel" style={{ display: 'block', background: '#fff', borderRadius: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px', padding: '10px' }}>
-              <div style={{ 
-                fontSize: '48px', 
-                fontWeight: 'bold', 
-                color: titleResult.score > 70 ? '#22c55e' : '#f59e0b',
-                minWidth: '100px'
-              }}>
-                {titleResult.score}%
-              </div>
-              <p style={{ color: '#333' }}><strong>Вердикт:</strong> {titleResult.analysis}</p>
-            </div>
-            
-            <div className="list-grid">
-              <BulletList title="Плюсы" items={titleResult.pros} />
-              <BulletList title="Что плохо" items={titleResult.cons} />
-              <BulletList title="AI рекомендует варианты" items={titleResult.improvements} />
-            </div>
-          </div>
-        )}
-      </section>
     </main>
   );
 }
