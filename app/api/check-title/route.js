@@ -15,42 +15,29 @@ export async function POST(request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        // Используем более быструю модель, чтобы не вылетать по таймауту на Vercel
         model: "llama-3.1-8b-instant", 
         messages: [
           {
             role: "system",
-            content: "Ты — эксперт по YouTube. Оцени заголовок. Отвечай СТРОГО в формате JSON на русском языке."
+            content: "Ты — эксперт по виральному контенту на YouTube. Твоя задача — проанализировать заголовок и предложить 7 КРУТЫХ, кликабельных альтернатив. Отвечай СТРОГО в формате JSON на русском языке."
           },
           {
             role: "user",
-            content: `Оцени этот заголовок и предложи 3 варианта лучше. Формат ответа строго такой: {"score": 85, "analysis": "текст", "pros": ["..."], "cons": ["..."], "improvements": ["..."]}. Заголовок: "${title}"`
+            content: `Оцени заголовок: "${title}". Верни JSON: {"score": число, "analysis": "текст", "pros": ["пункт1", "пункт2"], "cons": ["пункт1", "пункт2"], "improvements": ["вариант1", "вариант2", "вариант3", "вариант4", "вариант5", "вариант6", "вариант7"]}`
           }
         ],
         response_format: { type: "json_object" },
-        temperature: 0.7,
+        temperature: 0.8,
       }),
     });
 
     const data = await response.json();
+    if (!response.ok) throw new Error("Ошибка Groq API");
 
-    // Если Groq вернул ошибку (например, неверный ключ)
-    if (!response.ok) {
-      console.error("Groq API Error:", data);
-      return Response.json({ 
-        error: `Ошибка Groq: ${data.error?.message || "Проверьте GROQ_API_KEY в настройках Vercel"}` 
-      }, { status: response.status });
-    }
-
-    const content = data.choices[0]?.message?.content;
-    if (!content) throw new Error("Пустой ответ от нейросети");
-
-    return Response.json(JSON.parse(content));
+    const content = JSON.parse(data.choices[0].message.content);
+    return Response.json(content);
 
   } catch (error) {
-    console.error("Title Lab Error:", error);
-    return Response.json({ 
-      error: "Не удалось связаться с нейросетью. Убедитесь, что в Vercel добавлен GROQ_API_KEY." 
-    }, { status: 500 });
+    return Response.json({ error: "Ошибка нейросети. Проверьте соединение." }, { status: 500 });
   }
 }
