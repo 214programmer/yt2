@@ -1,0 +1,24 @@
+{
+  "name": "youtube-producer",
+  "version": "1.0.0",
+  "description": "AI analytics studio for YouTube channels powered by YouTube Data API and Groq.",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "check:api": "node scripts/check-api.mjs",
+    "start": "next start"
+  },
+  "keywords": [
+    "nextjs",
+    "youtube",
+    "groq",
+    "vercel"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "next": "^16.2.4",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  }
+}
