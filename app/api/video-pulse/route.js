@@ -3,24 +3,28 @@ import { isValidAccessCode } from "@/lib/access-codes";
 export const runtime = "nodejs";
 
 export async function POST(request) {
+  // Настройки для обхода блокировки браузером (CORS)
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+
   try {
     const { videoUrl, accessCode } = await request.json();
 
     if (!isValidAccessCode(accessCode)) {
-      return Response.json({ error: "Неверный код доступа" }, { status: 401 });
+      return Response.json({ error: "Неверный код доступа" }, { status: 401, headers: corsHeaders });
     }
 
-    // 1. Достаем ID видео из ссылки
     const videoId = videoUrl.split('v=')[1]?.split('&')[0];
-    if (!videoId) return Response.json({ error: "Неверная ссылка на видео" }, { status: 400 });
+    if (!videoId) return Response.json({ error: "ID не найден" }, { status: 400, headers: corsHeaders });
 
-    // 2. Запрос к YouTube API за статистикой видео
     const ytRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=${videoId}&key=${process.env.YOUTUBE_API_KEY}`);
     const ytData = await ytRes.json();
     const stats = ytData.items[0].statistics;
     const info = ytData.items[0].snippet;
 
-    // 3. Запрос к Groq за объяснением "Почему?"
     const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -30,15 +34,8 @@ export async function POST(request) {
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [
-          {
-            role: "system",
-            content: "Ты — аналитик YouTube. Объясни успех видео на основе его цифр и названия. Отвечай кратко в JSON на русском."
-          },
-          {
-            role: "user",
-            content: `Видео: "${info.title}". Просмотров: ${stats.viewCount}, Лайков: ${stats.likeCount}. Объясни почему оно популярно и сколько примерно оно принесло подписчиков (оценка AI). 
-            JSON: {"explanation": "текст", "subEstimate": "число"}`
-          }
+          { role: "system", content: "Ты аналитик YouTube. Дай JSON: {\"explanation\": \"...\", \"subEstimate\": \"...\"}" },
+          { role: "user", content: `Видео: ${info.title}. Просмотры: ${stats.viewCount}` }
         ],
         response_format: { type: "json_object" }
       }),
@@ -48,14 +45,24 @@ export async function POST(request) {
     const aiData = JSON.parse(aiExplanation.choices[0].message.content);
 
     return Response.json({
-      title: info.title,
       views: stats.viewCount,
-      likes: stats.likeCount,
-      explanation: aiData.explanation,
-      subEstimate: aiData.subEstimate
-    });
+      subEstimate: aiData.subEstimate,
+      explanation: aiData.explanation
+    }, { headers: corsHeaders });
 
   } catch (error) {
-    return Response.json({ error: "Ошибка анализа видео" }, { status: 500 });
+    return Response.json({ error: "Ошибка сервера" }, { status: 500, headers: corsHeaders });
   }
+}
+
+// Добавь это, чтобы браузер не ругался на проверку связи
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
 }
