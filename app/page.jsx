@@ -9,29 +9,16 @@ const EXAMPLES = [
 ];
 
 const numberFormatter = new Intl.NumberFormat("ru-RU");
-
-function formatNumber(value) {
-  return numberFormatter.format(Number(value || 0));
-}
-
-function formatPercent(value) {
-  return `${Number(value || 0).toFixed(1)}%`;
-}
-
-function formatDate(value) {
-  if (!value) return "Нет даты";
-  return new Date(value).toLocaleDateString("ru-RU", {
-    day: "2-digit", month: "short", year: "numeric",
-  });
-}
+const formatNumber = (v) => numberFormatter.format(Number(v || 0));
+const formatPercent = (v) => `${Number(v || 0).toFixed(1)}%`;
+const formatDate = (v) => v ? new Date(v).toLocaleDateString("ru-RU", { day: "2-digit", month: "short", year: "numeric" }) : "Нет даты";
 
 function formatDuration(seconds) {
   const safe = Number(seconds || 0);
-  const hours = Math.floor(safe / 3600);
-  const minutes = Math.floor((safe % 3600) / 60);
-  const secs = safe % 60;
-  if (hours > 0) return `${hours}ч ${minutes}м`;
-  return `${minutes}м ${secs}с`;
+  const h = Math.floor(safe / 3600);
+  const m = Math.floor((safe % 3600) / 60);
+  const s = safe % 60;
+  return h > 0 ? `${h}ч ${m}м` : `${m}м ${s}с`;
 }
 
 function MetricCard({ label, value, hint }) {
@@ -48,11 +35,7 @@ function BulletList({ title, items }) {
   return (
     <div className="list-card">
       <h3>{title}</h3>
-      <ul>
-        {(items || []).map((item, idx) => (
-          <li key={idx}>{item}</li>
-        ))}
-      </ul>
+      <ul>{(items || []).map((item, idx) => <li key={idx}>{item}</li>)}</ul>
     </div>
   );
 }
@@ -64,53 +47,36 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [planDetails, setPlanDetails] = useState(null);
   const [planLoading, setPlanLoading] = useState(false);
-  const [planError, setPlanError] = useState("");
 
-  // Title Lab State
   const [testTitle, setTestTitle] = useState("");
   const [titleResult, setTitleResult] = useState(null);
   const [titleLoading, setTitleLoading] = useState(false);
 
-  // --- Функция Анализа Канала ---
+  // --- ПОЛНЫЙ АНАЛИЗ КАНАЛА ---
   async function handleSubmit(event) {
     event.preventDefault();
-    const accessCode = window.prompt("Введите код доступа от администратора");
-    if (!accessCode) {
-      setError("Для запуска анализа нужен код доступа.");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    setResult(null);
-    setPlanDetails(null);
-    setPlanError("");
-
+    const accessCode = window.prompt("Введите код доступа администратора");
+    if (!accessCode) return;
+    setLoading(true); setError(""); setResult(null); setPlanDetails(null);
     try {
-      const response = await fetch("/api/analyze", {
+      const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ channelUrl, accessCode }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Не удалось выполнить анализ.");
-      setResult(payload);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+      setResult(data);
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
   }
 
-  // --- Функция Title Lab (с кодом доступа) ---
+  // --- TITLE LAB ---
   async function handleCheckTitle(e) {
     e.preventDefault();
     if (!testTitle) return;
-
-    const accessCode = window.prompt("Введите код доступа для работы Title Lab");
+    const accessCode = window.prompt("Введите код доступа администратора");
     if (!accessCode) return;
-
-    setTitleLoading(true);
-    setTitleResult(null);
+    setTitleLoading(true); setTitleResult(null);
     try {
       const res = await fetch("/api/check-title", {
         method: "POST",
@@ -120,35 +86,21 @@ export default function HomePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ошибка");
       setTitleResult(data);
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setTitleLoading(false);
-    }
+    } catch (err) { alert(err.message); } finally { setTitleLoading(false); }
   }
 
   async function handlePlanDetails() {
     if (!result) return;
     setPlanLoading(true);
-    setPlanError("");
     try {
-      const response = await fetch("/api/plan-details", {
+      const res = await fetch("/api/plan-details", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          channel: result.channel,
-          stats: result.stats,
-          analysis: result.analysis,
-        }),
+        body: JSON.stringify({ channel: result.channel, stats: result.stats, analysis: result.analysis }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Ошибка детализации.");
-      setPlanDetails(payload);
-    } catch (err) {
-      setPlanError(err.message);
-    } finally {
-      setPlanLoading(false);
-    }
+      const data = await res.json();
+      setPlanDetails(data);
+    } catch (err) { alert(err.message); } finally { setPlanLoading(false); }
   }
 
   const coverage = result?.stats?.coverage;
@@ -158,49 +110,29 @@ export default function HomePage() {
     <main className="page-shell">
       <section className="hero">
         <div className="hero-copy">
-          <span className="hero-pill">Vercel-ready • YouTube API • Groq AI</span>
+          <span className="hero-pill">PRO-LEVEL • YouTube API • Groq AI</span>
           <h1>Channel Scope</h1>
-          <p>Вставьте ссылку на YouTube-канал и получите глубокий AI-аудит.</p>
-          <div className="hero-tags">
-            <span>Аналитика канала</span>
-            <span>Разбор роликов</span>
-            <span>Советы по росту</span>
-            <span>Конкурентная разведка</span>
-          </div>
+          <p>Профессиональный AI-аудит каналов и лаборатория заголовков с анализом психологии клика.</p>
         </div>
 
-        <form className="hero-form" onSubmit={handleSubmit} style={{ marginBottom: '20px' }}>
-          <label htmlFor="channelUrl">Ссылка на канал</label>
-          <input
-            id="channelUrl"
-            type="text"
-            value={channelUrl}
-            onChange={(event) => setChannelUrl(event.target.value)}
-            placeholder="https://www.youtube.com/@channel"
-          />
-          <div className="example-row">
-            {EXAMPLES.map((example) => (
-              <button key={example} type="button" className="ghost-chip" onClick={() => setChannelUrl(example)}>
-                {example.replace("https://www.youtube.com/", "")}
-              </button>
-            ))}
-          </div>
+        <form className="hero-form" onSubmit={handleSubmit}>
+          <input type="text" value={channelUrl} onChange={(e) => setChannelUrl(e.target.value)} placeholder="Ссылка на канал..." />
           <button className="primary-button" type="submit" disabled={loading}>
-            {loading ? "Собираю аналитику..." : "Запустить анализ"}
+            {loading ? "Анализирую..." : "Запустить полный аудит"}
           </button>
         </form>
 
-        {/* --- TITLE LAB (С ПРОВЕРКОЙ КОДА) --- */}
-        <div className="panel" style={{ border: '2px solid #ff7a50', background: '#fff' }}>
+        {/* --- TITLE LAB --- */}
+        <div className="panel" style={{ marginTop: '20px', border: '2px solid #ff7a50', background: '#fff' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <h3 style={{ margin: 0 }}>Title Lab — Симулятор заголовка</h3>
-            <span className="eyebrow" style={{ color: '#ff7a50', fontWeight: 'bold' }}>ИНСТРУМЕНТ</span>
+            <h3 style={{ margin: 0 }}>Title Lab — Анализ заголовка</h3>
+            <span className="eyebrow" style={{ color: '#ff7a50', fontWeight: 'bold' }}>10 ВАРИАНТОВ</span>
           </div>
           <form onSubmit={handleCheckTitle} style={{ display: 'flex', gap: '10px' }}>
             <input
               type="text"
               style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd', color: '#000' }}
-              placeholder="Введите заголовок для проверки..."
+              placeholder="Напиши заголовок для проверки..."
               value={testTitle}
               onChange={(e) => setTestTitle(e.target.value)}
             />
@@ -211,160 +143,125 @@ export default function HomePage() {
 
           {titleResult && (
             <div style={{ marginTop: '20px', padding: '20px', background: '#f9f9f9', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
-                <div style={{ fontSize: '42px', fontWeight: 'bold', color: titleResult.score > 70 ? '#22c55e' : '#f59e0b' }}>
-                  {titleResult.score}%
+              <div style={{ display: 'flex', alignItems: 'center', gap: '25px', marginBottom: '20px' }}>
+                <div style={{ fontSize: '50px', fontWeight: '900', color: titleResult.score > 70 ? '#22c55e' : '#f59e0b' }}>{titleResult.score}%</div>
+                <div>
+                   <p style={{ color: '#000', margin: '0 0 5px 0' }}><strong>Вердикт:</strong> {titleResult.analysis}</p>
+                   <p style={{ color: '#666', fontSize: '14px', margin: 0 }}><strong>Психология:</strong> {titleResult.psychology}</p>
                 </div>
-                <p style={{ color: '#333' }}><strong>Вердикт:</strong> {titleResult.analysis}</p>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-                <BulletList title="Плюсы" items={titleResult.pros} />
-                <BulletList title="Минусы" items={titleResult.cons} />
+                <BulletList title="Сильные стороны" items={titleResult.pros} />
+                <BulletList title="Что мешает клику" items={titleResult.cons} />
               </div>
               <div className="list-card" style={{ width: '100%', border: '1px solid #ff7a50' }}>
-                <h3 style={{ color: '#ff7a50' }}>7 вариантов от AI (Нажми, чтобы скопировать)</h3>
-                <ul style={{ padding: '10px' }}>
+                <h3 style={{ color: '#ff7a50' }}>10 улучшенных вариантов (нажми, чтобы скопировать)</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '15px' }}>
                   {titleResult.improvements.map((v, i) => (
-                    <li key={i} onClick={() => { navigator.clipboard.writeText(v); alert('Скопировано!'); }} 
-                        style={{ cursor: 'pointer', padding: '8px', borderBottom: '1px solid #eee', listStyle: 'none' }}>
+                    <div key={i} onClick={() => {navigator.clipboard.writeText(v); alert('Скопировано!');}} 
+                         style={{ padding: '10px', background: '#fff', border: '1px dashed #ff7a50', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', color: '#000' }}>
                       {i + 1}. {v}
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             </div>
           )}
         </div>
       </section>
 
-      {error ? <div className="status-banner error">{error}</div> : null}
-      {loading ? <div className="status-banner">Анализирую данные канала...</div> : null}
+      {error && <div className="status-banner error">{error}</div>}
 
-      {result ? (
+      {result && (
         <>
-          <section className="channel-header" style={result.channel.banner ? { backgroundImage: `linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.96)), url(${result.channel.banner})` } : undefined}>
+          {/* ШАПКА КАНАЛА */}
+          <section className="channel-header" style={result.channel.banner ? { backgroundImage: `linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.95)), url(${result.channel.banner})` } : {}}>
             <div className="channel-meta">
               {result.channel.thumbnail && <img className="channel-avatar" src={result.channel.thumbnail} alt="" />}
               <div>
-                <span className="eyebrow">Канал</span>
                 <h2>{result.channel.title}</h2>
                 <p>{result.analysis.summary}</p>
-                <div className="hero-tags">
-                  {(result.stats.topicFingerprint.keywords || []).slice(0, 6).map((k) => <span key={k}>{k}</span>)}
-                </div>
               </div>
             </div>
           </section>
 
+          {/* МЕТРИКИ */}
           <section className="metrics-grid">
-            <MetricCard label="Подписчики" value={formatNumber(result.channel.subscriberCount)} hint="Всего" />
-            <MetricCard label="Просмотры" value={formatNumber(result.channel.viewCount)} hint="На канале" />
+            <MetricCard label="Подписчики" value={formatNumber(result.channel.subscriberCount)} hint="Всего на канале" />
+            <MetricCard label="Просмотры" value={formatNumber(result.channel.viewCount)} hint="Суммарно" />
             <MetricCard label="Видео" value={formatNumber(coverage.analyzedVideos)} hint="В анализе" />
-            <MetricCard label="Средние" value={formatNumber(result.stats.averages.views)} hint="Просмотры" />
-            <MetricCard label="ER" value={formatPercent(result.stats.averages.engagementRate)} hint="Вовлеченность" />
-            <MetricCard label="Частота" value={`${result.stats.averages.postingCadenceDays} дн.`} hint="График" />
+            <MetricCard label="Средний ER" value={formatPercent(result.stats.averages.engagementRate)} hint="Вовлеченность" />
           </section>
 
-          <section className="two-column">
-            <div className="panel">
-              <span className="eyebrow">Позиционирование</span>
-              <h3>{result.analysis.positioning.niche}</h3>
-              <p>{result.analysis.positioning.targetAudience}</p>
-              <p className="muted">{result.analysis.positioning.contentEngine}</p>
-            </div>
-            <div className="panel">
-              <span className="eyebrow">Цифры</span>
-              <div className="stat-lines">
-                <div><span>Медиана</span><strong>{formatNumber(result.stats.averages.medianViews)}</strong></div>
-                <div><span>Скорость</span><strong>{formatNumber(result.stats.averages.viewsPerDay)}/д</strong></div>
-                <div><span>Длина</span><strong>{formatDuration(result.stats.averages.durationSeconds)}</strong></div>
-                <div><span>Shorts</span><strong>{formatPercent(result.stats.averages.shortsShare)}</strong></div>
-              </div>
-            </div>
-          </section>
-
-          <section className="list-grid">
-            <BulletList title="Преимущества" items={result.analysis.channelAudit.strengths} />
-            <BulletList title="Недочеты" items={result.analysis.channelAudit.weaknesses} />
-            <BulletList title="Быстрые улучшения" items={result.analysis.channelAudit.quickWins} />
-            <BulletList title="Риски" items={result.analysis.channelAudit.strategicRisks} />
-          </section>
-
-          <section className="list-grid">
-            <BulletList title="Что работает" items={result.analysis.contentPatterns.winningFormats} />
-            <BulletList title="Что не работает" items={result.analysis.contentPatterns.underperformingPatterns} />
-            <BulletList title="Заголовки" items={result.analysis.contentPatterns.titleInsights} />
-            <BulletList title="Подача" items={result.analysis.contentPatterns.thumbnailInsights} />
-          </section>
-
-          {topVideo && (
-            <section className="spotlight">
-              <div className="spotlight-main">
-                <span className="eyebrow">Топ видео</span>
-                <h3>{topVideo.title}</h3>
-                <a className="inline-link" href={topVideo.url} target="_blank" rel="noreferrer">Открыть на YouTube</a>
-              </div>
-              <div className="spotlight-grid">
-                <BulletList title="Почему выстрелил" items={result.analysis.topVideoBreakdown.whyItWorked} />
-                <BulletList title="Что повторить" items={result.analysis.topVideoBreakdown.replicableElements} />
-                <BulletList title="Осторожнее" items={result.analysis.topVideoBreakdown.cautionNotes} />
-              </div>
-            </section>
-          )}
-
+          {/* КОНКУРЕНТЫ - ТЕПЕРЬ КЛИКАБЕЛЬНЫ */}
           <section className="panel">
-            <span className="eyebrow">Конкуренты</span>
-            <div className="competitor-grid">
+            <span className="eyebrow">Конкурентная разведка</span>
+            <h3>Видео конкурентов, которые сейчас растут</h3>
+            <div className="competitor-grid" style={{ marginTop: '20px' }}>
               {result.analysis.competitorTakeaways.videos.map((v) => (
-                <article key={v.videoId} className="competitor-card">
-                  <h4>{v.title}</h4>
-                  <p className="muted">{v.channelTitle}</p>
-                  <ul>{v.whyItPopped.map((i) => <li key={i}>{i}</li>)}</ul>
+                <article key={v.videoId} className="competitor-card" style={{ padding: '20px', background: '#fff', borderRadius: '12px', border: '1px solid #eee' }}>
+                  <a href={v.url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: '#ff7a50', fontWeight: 'bold', fontSize: '18px', display: 'block', marginBottom: '10px' }}>
+                    {v.title} ↗
+                  </a>
+                  <p className="muted" style={{ marginBottom: '15px' }}>Канал: {v.channelTitle}</p>
+                  <div style={{ fontSize: '14px', color: '#444' }}>
+                    <strong>Почему залетело:</strong>
+                    <ul style={{ margin: '5px 0 15px 0', paddingLeft: '20px' }}>{v.whyItPopped.map((i) => <li key={i}>{i}</li>)}</ul>
+                    <strong>Что забрать себе:</strong>
+                    <ul style={{ margin: '5px 0 0 0', paddingLeft: '20px' }}>{v.ideasToAdapt.map((i) => <li key={i}>{i}</li>)}</ul>
+                  </div>
                 </article>
               ))}
             </div>
           </section>
 
+          {/* ПЛАН РОСТА */}
           <section className="panel">
-            <h3>План роста</h3>
-            <div className="list-grid">
-              <BulletList title="7 дней" items={result.analysis.actionPlan.next7Days} />
-              <BulletList title="30 дней" items={result.analysis.actionPlan.next30Days} />
+            <span className="eyebrow">Стратегия</span>
+            <h3>Пошаговый план развития</h3>
+            <div className="list-grid" style={{ marginTop: '20px' }}>
+              <BulletList title="План на 7 дней" items={result.analysis.actionPlan.next7Days} />
+              <BulletList title="План на 30 дней" items={result.analysis.actionPlan.next30Days} />
               <BulletList title="Эксперименты" items={result.analysis.actionPlan.experimentIdeas} />
             </div>
-            <button className="secondary-button" onClick={handlePlanDetails} disabled={planLoading}>
-              {planLoading ? "Генерирую..." : "Узнать подробнее"}
+            <button className="secondary-button" onClick={handlePlanDetails} disabled={planLoading} style={{ marginTop: '20px' }}>
+              {planLoading ? "AI детализирует план..." : "Раскрыть подробную инструкцию"}
             </button>
+            
             {planDetails && (
-              <div className="details-panel" style={{ marginTop: '20px' }}>
-                <BulletList title="Чеклист" items={planDetails.details.checklist} />
-                <BulletList title="Метрики" items={planDetails.details.metricsToWatch} />
-                <BulletList title="Промпты" items={planDetails.details.prompts} />
+              <div className="details-panel" style={{ marginTop: '30px', background: '#f0f4f8', padding: '30px', borderRadius: '15px' }}>
+                <h3>Детальная инструкция по реализации</h3>
+                <p style={{ marginBottom: '25px', color: '#444' }}>{planDetails.details.overview}</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  <BulletList title="Чек-лист для автора" items={planDetails.details.checklist} />
+                  <BulletList title="Метрики контроля" items={planDetails.details.metricsToWatch} />
+                </div>
               </div>
             )}
           </section>
 
+          {/* ТАБЛИЦА ВИДЕО */}
           <section className="panel">
-            <h3>Разбивка по роликам</h3>
-            <div className="table-wrap">
-              <table className="videos-table">
-                <thead><tr><th>Видео</th><th>Дата</th><th>Просмотры</th><th>ER</th><th>Формат</th></tr></thead>
-                <tbody>
-                  {result.videos.map((v) => (
-                    <tr key={v.id}>
-                      <td><a href={v.url} target="_blank" rel="noreferrer">{v.title}</a></td>
-                      <td>{formatDate(v.publishedAt)}</td>
-                      <td>{formatNumber(v.viewCount)}</td>
-                      <td>{formatPercent(v.engagementRate)}</td>
-                      <td>{v.isShort ? "Shorts" : formatDuration(v.durationSeconds)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+             <h3>Подробный аудит последних роликов</h3>
+             <div className="table-wrap">
+               <table className="videos-table">
+                 <thead><tr><th>Видео</th><th>Дата</th><th>Просмотры</th><th>ER</th><th>Формат</th></tr></thead>
+                 <tbody>
+                   {result.videos.map((v) => (
+                     <tr key={v.id}>
+                       <td><a href={v.url} target="_blank" rel="noreferrer" style={{ fontWeight: 'bold' }}>{v.title}</a></td>
+                       <td>{formatDate(v.publishedAt)}</td>
+                       <td>{formatNumber(v.viewCount)}</td>
+                       <td>{formatPercent(v.engagementRate)}</td>
+                       <td>{v.isShort ? "Shorts" : formatDuration(v.durationSeconds)}</td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
           </section>
         </>
-      ) : null}
+      )}
     </main>
   );
 }
