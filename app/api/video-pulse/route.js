@@ -3,7 +3,6 @@ import { isValidAccessCode } from "@/lib/access-codes";
 export const runtime = "nodejs";
 
 export async function POST(request) {
-  // Настройки для обхода блокировки браузером (CORS)
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -12,57 +11,57 @@ export async function POST(request) {
 
   try {
     const { videoUrl, accessCode } = await request.json();
-
-    if (!isValidAccessCode(accessCode)) {
-      return Response.json({ error: "Неверный код доступа" }, { status: 401, headers: corsHeaders });
-    }
+    if (!isValidAccessCode(accessCode)) return Response.json({ error: "401" }, { status: 401, headers: corsHeaders });
 
     const videoId = videoUrl.split('v=')[1]?.split('&')[0];
-    if (!videoId) return Response.json({ error: "ID не найден" }, { status: 400, headers: corsHeaders });
-
-    const ytRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=${videoId}&key=${process.env.YOUTUBE_API_KEY}`);
+    const ytRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet,contentDetails&id=${videoId}&key=${process.env.YOUTUBE_API_KEY}`);
     const ytData = await ytRes.json();
+    
+    if (!ytData.items?.length) return Response.json({ error: "No video" }, { status: 404, headers: corsHeaders });
+
     const stats = ytData.items[0].statistics;
     const info = ytData.items[0].snippet;
+    
+    // Считаем вовлеченность (лайки к просмотрам)
+    const er = ((Number(stats.likeCount) / Number(stats.viewCount)) * 100).toFixed(1);
 
     const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Authorization": `Bearer ${process.env.GROQ_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [
-          { role: "system", content: "Ты аналитик YouTube. Дай JSON: {\"explanation\": \"...\", \"subEstimate\": \"...\"}" },
-          { role: "user", content: `Видео: ${info.title}. Просмотры: ${stats.viewCount}` }
+          { role: "system", content: "Ты PRO-аналитик YouTube. Дай ответ СТРОГО в JSON на русском." },
+          { role: "user", content: `Видео: "${info.title}". Просмотры: ${stats.viewCount}, Лайки: ${stats.likeCount}. 
+            Дай JSON: {
+              "subs": "оценка новых подписок числом", 
+              "secret": "в чем главный секрет успеха (1 фраза)", 
+              "hook": "оценка начала видео (хука)",
+              "advice": "что улучшить в упаковке"
+            }`
+          }
         ],
         response_format: { type: "json_object" }
       }),
     });
 
-    const aiExplanation = await groqRes.json();
-    const aiData = JSON.parse(aiExplanation.choices[0].message.content);
+    const aiData = await groqRes.json();
+    const ai = JSON.parse(aiData.choices[0].message.content);
 
     return Response.json({
+      title: info.title,
       views: stats.viewCount,
-      subEstimate: aiData.subEstimate,
-      explanation: aiData.explanation
+      likes: stats.likeCount,
+      er: er + "%",
+      subs: ai.subs,
+      secret: ai.secret,
+      hook: ai.hook,
+      advice: ai.advice
     }, { headers: corsHeaders });
 
   } catch (error) {
-    return Response.json({ error: "Ошибка сервера" }, { status: 500, headers: corsHeaders });
+    return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }
 }
 
-// Добавь это, чтобы браузер не ругался на проверку связи
-export async function OPTIONS() {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    },
-  });
-}
+export async function OPTIONS() { return new Response(null, { status: 204, headers: corsHeaders }); }
