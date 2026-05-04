@@ -373,27 +373,46 @@ export default function HomePage() {
           </section>
         </>
       )}
+{/* УСТАНОВКА РАСШИРЕНИЯ */}
+      <section id="extension" className="panel" style={{ marginTop: '80px', background: '#111', color: '#fff', padding: '60px 40px', textAlign: 'center', borderRadius: '20px' }}>
+        <h2 style={{ color: '#ff7a50', fontSize: '36px', fontWeight: '900', marginBottom: '10px' }}>Расширение Pulse для Chrome</h2>
+        <p style={{ color: '#888', fontSize: '16px', marginBottom: '40px' }}>Анализируйте любое видео прямо на YouTube в один клик без перехода на сайт.</p>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', textAlign: 'left', marginBottom: '40px' }}>
+          {/* ШАГ 1 */}
+          <div style={{ padding: '25px', background: '#1a1a1a', borderRadius: '15px', border: '1px solid #222', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <strong style={{ color: '#ff7a50', fontSize: '18px' }}>Шаг 1. Скачивание</strong><br/>
+              <p style={{ fontSize: '14px', color: '#aaa', marginTop: '10px' }}>Загрузите архив с расширением на свой компьютер.</p>
+            </div>
+            <a 
+              href="/pulse-extension.zip" 
+              download 
+              style={{ display: 'block', background: '#ff7a50', color: '#fff', textDecoration: 'none', padding: '12px', borderRadius: '8px', marginTop: '20px', fontWeight: 'bold', textAlign: 'center' }}
+            >
+              Скачать .ZIP
+            </a>
+          </div>
 
-      {/* УСТАНОВКА РАСШИРЕНИЯ */}
-      <section id="extension" className="panel" style={{ marginTop: '80px', background: '#111', color: '#fff', padding: '50px', textAlign: 'center' }}>
-        <h2 style={{ color: '#ff7a50', fontSize: '32px' }}>Установите расширение Pulse</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', textAlign: 'left', marginBottom: '40px', marginTop: '30px' }}>
-           <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}>
-             <strong style={{ color: '#ff7a50' }}>Шаг 1.</strong><br/> Скачайте архив ZIP по кнопке ниже.
-           </div>
-           <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}>
-             <strong style={{ color: '#ff7a50' }}>Шаг 2.</strong><br/> Включите Режим разработчика в chrome://extensions.
-           </div>
-           <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}>
-             <strong style={{ color: '#ff7a50' }}>Шаг 3.</strong><br/> Нажмите Загрузить распакованную папку.
-           </div>
+          {/* ШАГ 2 */}
+          <div style={{ padding: '25px', background: '#1a1a1a', borderRadius: '15px', border: '1px solid #222' }}>
+            <strong style={{ color: '#ff7a50', fontSize: '18px' }}>Шаг 2. Активация</strong><br/>
+            <p style={{ fontSize: '14px', color: '#aaa', marginTop: '10px' }}>
+              Откройте <code style={{color: '#fff'}}>chrome://extensions</code>, включите <b>"Режим разработчика"</b> в углу и нажмите <b>"Загрузить распакованное"</b>.
+            </p>
+          </div>
+
+          {/* ШАГ 3 */}
+          <div style={{ padding: '25px', background: '#1a1a1a', borderRadius: '15px', border: '1px solid #222' }}>
+            <strong style={{ color: '#ff7a50', fontSize: '18px' }}>Шаг 3. Вход</strong><br/>
+            <p style={{ fontSize: '14px', color: '#aaa', marginTop: '10px' }}>Используйте ваш персональный ID из блока ниже для входа в расширение.</p>
+          </div>
         </div>
-        <div style={{ padding: '20px', border: '1px dashed #444', borderRadius: '10px' }}>
-          <p>Ваш персональный код для расширения:</p>
-          <code style={{ fontSize: '24px', color: '#ff7a50' }}>{user?.code || "Код не найден"}</code>
+
+        <div style={{ padding: '30px', background: '#000', border: '1px dashed #444', borderRadius: '15px' }}>
+          <p style={{ color: '#888', fontSize: '14px', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>Ваш облачный ID доступа:</p>
+          <code style={{ fontSize: '28px', color: '#ff7a50', fontWeight: 'bold', fontFamily: 'monospace' }}>
+            {user?.code || "DEMO-2026"}
+          </code>
         </div>
-        <a href="/pulse-extension.zip" download style={{ display: 'inline-block', background: '#ff7a50', color: '#fff', textDecoration: 'none', padding: '15px 40px', borderRadius: '8px', marginTop: '30px', fontWeight: 'bold' }}>СКАЧАТЬ .ZIP</a>
       </section>
-    </main>
-  );
-}
