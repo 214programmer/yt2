@@ -151,7 +151,7 @@ export default function HomePage() {
            <div><div style={{ fontWeight: 'bold', fontSize: '18px', color: '#000' }}>{user?.name}</div><div style={{ fontSize: '11px', color: '#22c55e' }}>● PRO ACCOUNT</div></div>
         </div>
         <div style={{ display: 'flex', gap: '20px' }}>
-          <a href="#extension" style={{ color: '#ff7a50', textDecoration: 'none', fontWeight: 'bold' }}>УСТАНОВИТЬ РАСШИРЕНИЕ 📥</a>
+          <a href="#extension" style={{ color: '#ff7a50', textDecoration: 'none', fontWeight: 'bold' }}>УСТАНОВИТЬ РАСШИРЕНИЕ</a>
           <button onClick={() => {localStorage.removeItem("channel_scope_user"); location.reload();}} style={{ color: '#999', border: 'none', background: 'none', cursor: 'pointer' }}>ВЫЙТИ</button>
         </div>
       </header>
@@ -159,8 +159,10 @@ export default function HomePage() {
       <section className="hero">
         <h1 style={{ fontSize: '64px', fontWeight: '900', marginBottom: '15px' }}>Channel Scope</h1>
         <form className="hero-form" onSubmit={handleSubmit} style={{ maxWidth: '900px', margin: '0 auto 50px' }}>
-          <input type="text" value={channelUrl} onChange={(e) => setChannelUrl(e.target.value)} placeholder="Ссылка на канал..." />
-          <button className="primary-button" type="submit" disabled={loading}>{loading ? "..." : "Анализ"}</button>
+          <input type="text" value={channelUrl} onChange={(e) => setChannelUrl(e.target.value)} placeholder="Ссылка на канал..." style={{ padding: '18px', fontSize: '18px' }} />
+          <button className="primary-button" type="submit" disabled={loading} style={{ padding: '0 40px' }}>
+            {loading ? "Идет сбор данных..." : "Запустить полный аудит"}
+          </button>
         </form>
 
         <div className="panel" style={{ border: '2px solid #ff7a50', background: '#fff', padding: '40px', textAlign: 'left' }}>
@@ -169,8 +171,8 @@ export default function HomePage() {
             <span className="eyebrow" style={{ color: '#ff7a50', fontWeight: 'bold' }}>10 ВАРИАНТОВ</span>
           </div>
           <form onSubmit={handleCheckTitle} style={{ display: 'flex', gap: '15px', marginBottom: '30px' }}>
-            <input type="text" style={{ flex: 1, padding: '15px', borderRadius: '10px', border: '1px solid #ddd', color: '#000' }} placeholder="Введите заголовок..." value={testTitle} onChange={(e) => setTestTitle(e.target.value)} />
-            <button className="primary-button" type="submit" disabled={titleLoading}>{titleLoading ? "..." : "Оценить"}</button>
+            <input type="text" style={{ flex: 1, padding: '15px', borderRadius: '10px', border: '1px solid #ddd', fontSize: '18px', color: '#000' }} placeholder="Введите заголовок ролика..." value={testTitle} onChange={(e) => setTestTitle(e.target.value)} />
+            <button className="primary-button" type="submit" disabled={titleLoading} style={{ margin: 0, padding: '0 40px' }}>{titleLoading ? "..." : "Оценить"}</button>
           </form>
           {titleResult && (
             <div style={{ background: '#fcfcfc', padding: '35px', borderRadius: '15px', border: '1px solid #eee' }}>
@@ -179,11 +181,11 @@ export default function HomePage() {
                 <div style={{ flex: 1 }}><p style={{ fontSize: '17px', lineHeight: '1.6', color: '#333' }}>{titleResult.analysis}</p></div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                 <BulletList title="Сильные стороны" items={titleResult.pros} />
-                 <BulletList title="Минусы" items={titleResult.cons} />
+                 <BulletList title="Сильные стороны (Плюсы)" items={titleResult.pros} />
+                 <BulletList title="Критические недочеты (Минусы)" items={titleResult.cons} />
               </div>
               <div style={{ marginTop: '40px', padding: '30px', background: '#fff', border: '1px solid #ff7a50', borderRadius: '15px' }}>
-                <h4 style={{ color: '#ff7a50', marginBottom: '20px' }}>10 AI-вариантов (Нажми для копирования)</h4>
+                <h4 style={{ color: '#ff7a50', marginBottom: '20px', fontSize: '18px' }}>10 AI-вариантов (Нажми для копирования)</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                   {titleResult.improvements.map((v, i) => (
                     <div key={i} onClick={() => {navigator.clipboard.writeText(v); alert('Скопировано!');}} style={{ padding: '15px', background: '#fff8f6', border: '1px dashed #ff7a50', borderRadius: '10px', cursor: 'pointer', fontSize: '15px', color: '#000' }}>{v}</div>
@@ -194,6 +196,8 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      {error && <div className="status-banner error">{error}</div>}
 
       {result && (
         <>
@@ -208,7 +212,7 @@ export default function HomePage() {
             <MetricCard label="ПОДПИСЧИКИ" value={formatNumber(result.channel.subscriberCount)} hint="Общая база лояльных зрителей." />
             <MetricCard label="ПРОСМОТРЫ" value={formatNumber(result.channel.viewCount)} hint="Суммарный авторитет канала." />
             <MetricCard label="СРЕДНИЕ" value={formatNumber(result.stats.averages.views)} hint="Средние просмотры на видео." />
-            <MetricCard label="ER (Engagement)" value={formatPercent(result.stats.averages.engagementRate)} hint="Показатель активности." />
+            <MetricCard label="ER (Engagement)" value={formatPercent(result.stats.averages.engagementRate)} hint="Показатель активности аудитории." />
           </section>
 
           <section className="panel" style={{ marginTop: '40px', padding: '40px' }}>
@@ -228,7 +232,7 @@ export default function HomePage() {
           <section className="list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginTop: '40px' }}>
             <BulletList title="Преимущества" items={result.analysis.channelAudit.strengths} />
             <BulletList title="Недочеты" items={result.analysis.channelAudit.weaknesses} />
-            <BulletList title="Что 'залетает'" items={result.analysis.contentPatterns.winningFormats} />
+            <BulletList title="Что залетает" items={result.analysis.contentPatterns.winningFormats} />
             <BulletList title="Что тянет вниз" items={result.analysis.contentPatterns.underperformingPatterns} />
           </section>
 
@@ -239,7 +243,7 @@ export default function HomePage() {
                 <a className="inline-link" href={topVideo.url} target="_blank" rel="noreferrer" style={{ fontSize: '18px' }}>Открыть видео ↗</a>
               </div>
               <div className="spotlight-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-                <BulletList title="Почему выстрелил" items={result.analysis.topVideoBreakdown.whyItWorked} />
+                <BulletList title="Почему выстрелило" items={result.analysis.topVideoBreakdown.whyItWorked} />
                 <BulletList title="Что повторить" items={result.analysis.topVideoBreakdown.replicableElements} />
               </div>
             </section>
@@ -303,7 +307,7 @@ export default function HomePage() {
         <p style={{ color: '#888', marginBottom: '40px' }}>Анализируйте видео прямо на YouTube в один клик.</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', textAlign: 'left', marginBottom: '40px' }}>
           <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}><strong>Шаг 1.</strong> Скачайте архив ZIP.</div>
-          <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}><strong>Шаг 2.</strong> Включите 'Режим разработчика' в chrome://extensions.</div>
+          <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}><strong>Шаг 2.</strong> Включите Режим разработчика в chrome://extensions.</div>
           <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}><strong>Шаг 3.</strong> Загрузите распакованную папку.</div>
         </div>
         <div style={{ padding: '20px', border: '1px dashed #444', borderRadius: '10px' }}>
