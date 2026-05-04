@@ -50,14 +50,14 @@ export default function HomePage() {
   const [planDetails, setPlanDetails] = useState(null);
   const [planLoading, setPlanLoading] = useState(false);
 
-  // --- ЛОГИКА АККАУНТА ---
-  const [user, setUser] = useState(null); // { name: '', avatar: '', code: '' }
+  // --- АККАУНТ ---
+  const [user, setUser] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [regName, setRegName] = useState("");
   const [regCode, setRegCode] = useState("");
   const [regAvatar, setRegAvatar] = useState(AVATARS[0]);
 
-  // Title Lab State
+  // --- TITLE LAB ---
   const [testTitle, setTestTitle] = useState("");
   const [titleResult, setTitleResult] = useState(null);
   const [titleLoading, setTitleLoading] = useState(false);
@@ -73,10 +73,7 @@ export default function HomePage() {
 
   const handleRegister = (e) => {
     e.preventDefault();
-    if (!regName || !regCode) {
-      alert("Заполни все поля!");
-      return;
-    }
+    if (!regName || !regCode) { alert("Заполни имя и код!"); return; }
     const newUser = { name: regName, avatar: regAvatar, code: regCode };
     localStorage.setItem("channel_scope_user", JSON.stringify(newUser));
     setUser(newUser);
@@ -84,18 +81,17 @@ export default function HomePage() {
   };
 
   const handleLogout = () => {
-    if (confirm("Выйти из аккаунта? Все данные профиля будут удалены.")) {
+    if (confirm("Выйти и удалить данные профиля?")) {
       localStorage.removeItem("channel_scope_user");
       setUser(null);
       setIsRegistering(true);
     }
   };
 
-  // --- ФУНКЦИИ АНАЛИЗА ---
+  // --- ФУНКЦИИ АНАЛИЗА (ИСПОЛЬЗУЮТ user.code) ---
   async function handleSubmit(event) {
     event.preventDefault();
     if (!user) return;
-    
     setLoading(true); setError(""); setResult(null); setPlanDetails(null);
     try {
       const res = await fetch("/api/analyze", {
@@ -112,7 +108,6 @@ export default function HomePage() {
   async function handleCheckTitle(e) {
     e.preventDefault();
     if (!testTitle || !user) return;
-
     setTitleLoading(true); setTitleResult(null);
     try {
       const res = await fetch("/api/check-title", {
@@ -133,84 +128,52 @@ export default function HomePage() {
       const res = await fetch("/api/plan-details", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...result, accessCode: user.code }),
+        body: JSON.stringify({ channel: result.channel, stats: result.stats, analysis: result.analysis, accessCode: user.code }),
       });
       const data = await res.json();
       setPlanDetails(data);
     } catch (err) { alert(err.message); } finally { setPlanLoading(false); }
   }
 
-  // --- ЭКРАН РЕГИСТРАЦИИ ---
+  // ЭКРАН РЕГИСТРАЦИИ
   if (isRegistering) {
     return (
       <main className="page-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
         <div className="panel" style={{ width: '400px', textAlign: 'center', border: '2px solid #ff7a50' }}>
-          <span style={{ fontSize: '40px' }}>{regAvatar}</span>
-          <h2>Создать аккаунт</h2>
-          <p className="muted">Добро пожаловать в Channel Scope PRO</p>
-          
+          <span style={{ fontSize: '50px' }}>{regAvatar}</span>
+          <h2>Создать профиль</h2>
           <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '20px' }}>
-            <input 
-              type="text" 
-              placeholder="Твое имя" 
-              className="hero-form input"
-              style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd', color: '#000' }}
-              value={regName}
-              onChange={(e) => setRegName(e.target.value)}
-            />
-            
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
-              {AVATARS.map(a => (
-                <button 
-                  key={a} 
-                  type="button" 
-                  onClick={() => setRegAvatar(a)}
-                  style={{ fontSize: '24px', background: regAvatar === a ? '#fff1ed' : 'transparent', border: regAvatar === a ? '1px solid #ff7a50' : 'none', padding: '5px', borderRadius: '5px', cursor: 'pointer' }}
-                >
-                  {a}
-                </button>
-              ))}
+            <input type="text" placeholder="Твое имя" style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd', color: '#000' }} value={regName} onChange={(e) => setRegName(e.target.value)} />
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+              {AVATARS.map(a => <button key={a} type="button" onClick={() => setRegAvatar(a)} style={{ fontSize: '24px', background: regAvatar === a ? '#fff1ed' : 'transparent', border: 'none', cursor: 'pointer' }}>{a}</button>)}
             </div>
-
-            <input 
-              type="password" 
-              placeholder="Код доступа админа" 
-              className="hero-form input"
-              style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd', color: '#000' }}
-              value={regCode}
-              onChange={(e) => setRegCode(e.target.value)}
-            />
-
-            <button className="primary-button" type="submit">Начать работу</button>
+            <input type="password" placeholder="Код администратора" style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd', color: '#000' }} value={regCode} onChange={(e) => setRegCode(e.target.value)} />
+            <button className="primary-button" type="submit">Войти в систему</button>
           </form>
         </div>
       </main>
     );
   }
 
-  // --- ОСНОВНОЙ КОНТЕНТ ---
   const coverage = result?.stats?.coverage;
   const topVideo = result?.stats?.leaders?.topVideo;
 
   return (
     <main className="page-shell">
-      {/* ПАНЕЛЬ ПРОФИЛЯ */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', padding: '10px 20px', background: '#fff', borderRadius: '15px', border: '1px solid #eee' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-           <div style={{ fontSize: '32px', background: '#fff1ed', padding: '10px', borderRadius: '50%' }}>{user?.avatar}</div>
-           <div>
-             <div style={{ fontWeight: 'bold', fontSize: '18px', color: '#000' }}>{user?.name}</div>
-             <div style={{ fontSize: '12px', color: '#22c55e' }}>● Лицензия активна</div>
-           </div>
+      {/* ШАПКА ПРОФИЛЯ */}
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', padding: '10px 20px', background: '#fff', borderRadius: '12px', border: '1px solid #eee' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+           <span style={{ fontSize: '30px' }}>{user?.avatar}</span>
+           <div><strong>{user?.name}</strong><div style={{ fontSize: '11px', color: '#22c55e' }}>PRO-АККАУНТ</div></div>
         </div>
-        <button onClick={handleLogout} style={{ background: 'transparent', border: 'none', color: '#ff7a50', cursor: 'pointer', fontSize: '14px' }}>Выйти</button>
+        <button onClick={handleLogout} style={{ background: 'transparent', border: 'none', color: '#ff7a50', cursor: 'pointer' }}>Выйти</button>
       </header>
 
       <section className="hero">
         <div className="hero-copy">
-          <span className="hero-pill">PRO-DASHBOARD • {user?.name}</span>
+          <span className="hero-pill">PRO-ACCOUNT • {user?.name}</span>
           <h1>Channel Scope</h1>
-          <p>Твой персональный AI-ассистент готов к работе.</p>
+          <p>Вставьте ссылку на YouTube-канал для полного AI-аудита.</p>
         </div>
 
         <form className="hero-form" onSubmit={handleSubmit}>
@@ -222,34 +185,29 @@ export default function HomePage() {
 
         {/* TITLE LAB */}
         <div className="panel" style={{ marginTop: '20px', border: '2px solid #ff7a50', background: '#fff' }}>
-          <h3 style={{ margin: 0, color: '#000' }}>Title Lab — Анализ заголовка</h3>
-          <form onSubmit={handleCheckTitle} style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-            <input
-              type="text"
-              style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd', color: '#000' }}
-              placeholder="Введи заголовок..."
-              value={testTitle}
-              onChange={(e) => setTestTitle(e.target.value)}
-            />
-            <button className="primary-button" type="submit" disabled={titleLoading}>
-              {titleLoading ? "..." : "Оценить"}
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <h3 style={{ margin: 0, color: '#000' }}>Title Lab — Анализ заголовка</h3>
+            <span className="eyebrow" style={{ color: '#ff7a50', fontWeight: 'bold' }}>10 ВАРИАНТОВ</span>
+          </div>
+          <form onSubmit={handleCheckTitle} style={{ display: 'flex', gap: '10px' }}>
+            <input type="text" style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd', color: '#000' }} placeholder="Напиши заголовок..." value={testTitle} onChange={(e) => setTestTitle(e.target.value)} />
+            <button className="primary-button" type="submit" disabled={titleLoading}>{titleLoading ? "..." : "Оценить"}</button>
           </form>
-
           {titleResult && (
             <div style={{ marginTop: '20px', padding: '20px', background: '#f9f9f9', borderRadius: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '25px', marginBottom: '20px' }}>
                 <div style={{ fontSize: '50px', fontWeight: '900', color: titleResult.score > 70 ? '#22c55e' : '#f59e0b' }}>{titleResult.score}%</div>
                 <p style={{ color: '#000', margin: 0 }}><strong>Вердикт:</strong> {titleResult.analysis}</p>
               </div>
-              <div className="list-card" style={{ width: '100%', border: '1px solid #ff7a50' }}>
-                <h3 style={{ color: '#ff7a50' }}>10 виральных вариантов (кликни для копирования)</h3>
+              <div className="list-grid">
+                <BulletList title="Плюсы" items={titleResult.pros} />
+                <BulletList title="Минусы" items={titleResult.cons} />
+              </div>
+              <div className="list-card" style={{ width: '100%', border: '1px solid #ff7a50', marginTop: '20px' }}>
+                <h3 style={{ color: '#ff7a50' }}>10 улучшенных вариантов</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '15px' }}>
                   {titleResult.improvements.map((v, i) => (
-                    <div key={i} onClick={() => {navigator.clipboard.writeText(v); alert('Скопировано!');}} 
-                         style={{ padding: '10px', background: '#fff', border: '1px dashed #ff7a50', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', color: '#000' }}>
-                      {i + 1}. {v}
-                    </div>
+                    <div key={i} onClick={() => {navigator.clipboard.writeText(v); alert('Скопировано!');}} style={{ padding: '10px', background: '#fff', border: '1px dashed #ff7a50', borderRadius: '6px', cursor: 'pointer', color: '#000', fontSize: '13px' }}>{v}</div>
                   ))}
                 </div>
               </div>
@@ -262,32 +220,110 @@ export default function HomePage() {
 
       {result && (
         <>
-          {/* Здесь весь твой код отображения результатов, я его оставил без изменений */}
+          {/* РЕЗУЛЬТАТЫ АНАЛИЗА КАНАЛА */}
+          <section className="channel-header" style={result.channel.banner ? { backgroundImage: `linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.98)), url(${result.channel.banner})` } : {}}>
+            <div className="channel-meta">
+              {result.channel.thumbnail && <img className="channel-avatar" src={result.channel.thumbnail} alt="" />}
+              <div>
+                <h2>{result.channel.title}</h2>
+                <p>{result.analysis.summary}</p>
+                <div className="hero-tags">{(result.stats.topicFingerprint.keywords || []).slice(0, 6).map(k => <span key={k}>{k}</span>)}</div>
+              </div>
+            </div>
+          </section>
+
           <section className="metrics-grid">
             <MetricCard label="Подписчики" value={formatNumber(result.channel.subscriberCount)} hint="Всего" />
             <MetricCard label="Просмотры" value={formatNumber(result.channel.viewCount)} hint="Суммарно" />
-            <MetricCard label="Средний ER" value={formatPercent(result.stats.averages.engagementRate)} hint="Вовлеченность" />
+            <MetricCard label="Средние" value={formatNumber(result.stats.averages.views)} hint="На ролик" />
+            <MetricCard label="ER" value={formatPercent(result.stats.averages.engagementRate)} hint="Вовлеченность" />
           </section>
 
           <section className="list-grid">
             <BulletList title="Преимущества" items={result.analysis.channelAudit.strengths} />
             <BulletList title="Недочеты" items={result.analysis.channelAudit.weaknesses} />
+            <BulletList title="Быстрые улучшения" items={result.analysis.channelAudit.quickWins} />
+            <BulletList title="Риски" items={result.analysis.channelAudit.strategicRisks} />
           </section>
 
+          {topVideo && (
+            <section className="spotlight">
+              <div className="spotlight-main">
+                <span className="eyebrow">Самое популярное</span>
+                <h3>{topVideo.title}</h3>
+                <a className="inline-link" href={topVideo.url} target="_blank" rel="noreferrer">Открыть видео ↗</a>
+              </div>
+              <div className="spotlight-grid">
+                <BulletList title="Почему выстрелил" items={result.analysis.topVideoBreakdown.whyItWorked} />
+                <BulletList title="Что повторить" items={result.analysis.topVideoBreakdown.replicableElements} />
+              </div>
+            </section>
+          )}
+
+          {/* КОНКУРЕНТЫ */}
+          <section className="panel">
+            <h3>Видео по теме, которые залетели</h3>
+            <div className="competitor-grid">
+              {result.analysis.competitorTakeaways.videos.map((v) => (
+                <article key={v.videoId} className="competitor-card">
+                  <a href={v.url} target="_blank" rel="noreferrer" style={{ color: '#ff7a50', fontWeight: 'bold' }}>{v.title}</a>
+                  <p className="muted">{v.channelTitle}</p>
+                  <ul>{v.whyItPopped.map(i => <li key={i}>{i}</li>)}</ul>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          {/* ПЛАН РОСТА */}
           <section className="panel">
             <h3>План на 30 дней</h3>
-            <div className="list-grid">
+            <div className="list-grid plan-grid">
               <BulletList title="7 дней" items={result.analysis.actionPlan.next7Days} />
               <BulletList title="30 дней" items={result.analysis.actionPlan.next30Days} />
+              <BulletList title="Инсайты" items={result.analysis.contentPatterns.cadenceInsights} />
             </div>
             <button className="secondary-button" onClick={handlePlanDetails} disabled={planLoading} style={{ marginTop: '20px' }}>
-              {planLoading ? "AI думает..." : "Подробный чеклист"}
+              {planLoading ? "Генерирую инструкцию..." : "Узнать подробнее"}
             </button>
+
             {planDetails && (
-              <div style={{ marginTop: '20px', background: '#f0f4f8', padding: '20px', borderRadius: '12px' }}>
-                 <BulletList title="Твой чеклист" items={planDetails.details.checklist} />
+              <div className="details-panel" style={{ marginTop: '30px' }}>
+                <div className="phase-list">
+                  {planDetails.details.phases.map((p, i) => (
+                    <article className="phase-card" key={i}>
+                      <span className="phase-number">{i+1}</span>
+                      <h4>{p.title}</h4>
+                      <p>{p.objective}</p>
+                      <strong>Результат: {p.deliverable}</strong>
+                    </article>
+                  ))}
+                </div>
+                <div className="list-grid">
+                  <BulletList title="Чеклист" items={planDetails.details.checklist} />
+                  <BulletList title="Метрики" items={planDetails.details.metricsToWatch} />
+                </div>
               </div>
             )}
+          </section>
+
+          {/* ТАБЛИЦА */}
+          <section className="panel">
+            <h3>Подробная разбивка видео</h3>
+            <div className="table-wrap">
+              <table className="videos-table">
+                <thead><tr><th>Видео</th><th>Просмотры</th><th>ER</th><th>Формат</th></tr></thead>
+                <tbody>
+                  {result.videos.map((v) => (
+                    <tr key={v.id}>
+                      <td><a href={v.url} target="_blank" rel="noreferrer" style={{ fontWeight: 'bold' }}>{v.title}</a></td>
+                      <td>{formatNumber(v.viewCount)}</td>
+                      <td>{formatPercent(v.engagementRate)}</td>
+                      <td>{v.isShort ? "Shorts" : formatDuration(v.durationSeconds)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         </>
       )}
