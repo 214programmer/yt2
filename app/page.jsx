@@ -26,21 +26,21 @@ function formatDuration(seconds) {
 
 function MetricCard({ label, value, hint }) {
   return (
-    <article className="metric-card" style={{ flex: '1 1 300px', textAlign: 'left', padding: '30px' }}>
-      <span className="eyebrow" style={{ fontSize: '11px', letterSpacing: '1.5px' }}>{label}</span>
+    <article className="metric-card" style={{ flex: '1 1 250px', textAlign: 'left', padding: '30px', background: '#fff', borderRadius: '15px', border: '1px solid #eee' }}>
+      <span className="eyebrow" style={{ fontSize: '11px', letterSpacing: '1.5px', color: '#ff7a50', fontWeight: 'bold' }}>{label}</span>
       <strong style={{ fontSize: '36px', display: 'block', margin: '15px 0' }}>{value}</strong>
-      <p style={{ fontSize: '15px', color: '#555', lineHeight: '1.6' }}>{hint}</p>
+      <p style={{ fontSize: '14px', color: '#666', lineHeight: '1.6' }}>{hint}</p>
     </article>
   );
 }
 
 function BulletList({ title, items }) {
   return (
-    <div className="list-card" style={{ padding: '25px', width: '100%' }}>
+    <div className="list-card" style={{ padding: '25px', width: '100%', background: '#fff', borderRadius: '15px', border: '1px solid #eee' }}>
       <h3 style={{ marginBottom: '20px', fontSize: '20px' }}>{title}</h3>
-      <ul style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+      <ul style={{ display: 'flex', flexDirection: 'column', gap: '15px', paddingLeft: '20px' }}>
         {(items || []).map((item, idx) => (
-          <li key={idx} style={{ fontSize: '15.5px', lineHeight: '1.7', color: '#333' }}>{item}</li>
+          <li key={idx} style={{ fontSize: '15px', lineHeight: '1.6', color: '#333' }}>{item}</li>
         ))}
       </ul>
     </div>
@@ -55,7 +55,7 @@ export default function HomePage() {
   const [planDetails, setPlanDetails] = useState(null);
   const [planLoading, setPlanLoading] = useState(false);
 
-  // Состояния аккаунта
+  // Аккаунт
   const [user, setUser] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [regName, setRegName] = useState("");
@@ -80,6 +80,13 @@ export default function HomePage() {
     setUser(newUser); setIsRegistering(false);
   };
 
+  const handleLogout = () => {
+    if(confirm("Выйти из профиля?")) {
+      localStorage.removeItem("channel_scope_user");
+      setUser(null); setIsRegistering(true);
+    }
+  };
+
   async function handleSubmit(event) {
     event.preventDefault();
     setLoading(true); setError(""); setResult(null); setPlanDetails(null);
@@ -90,14 +97,14 @@ export default function HomePage() {
         body: JSON.stringify({ channelUrl, accessCode: user.code }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка");
+      if (!res.ok) throw new Error(data.error || "Ошибка аудита");
       setResult(data);
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   }
 
   async function handleCheckTitle(e) {
     e.preventDefault();
-    setTitleLoading(true);
+    setTitleLoading(true); setTitleResult(null);
     try {
       const res = await fetch("/api/check-title", {
         method: "POST",
@@ -105,6 +112,7 @@ export default function HomePage() {
         body: JSON.stringify({ title: testTitle, accessCode: user.code }),
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка AI");
       setTitleResult(data);
     } catch (err) { alert(err.message); } finally { setTitleLoading(false); }
   }
@@ -119,15 +127,22 @@ export default function HomePage() {
       });
       const data = await res.json();
       setPlanDetails(data);
-    } catch (err) { alert("Ошибка при генерации фаз"); } finally { setPlanLoading(false); }
+    } catch (err) { alert("Ошибка фаз"); } finally { setPlanLoading(false); }
   }
 
   const chartData = result?.videos?.map(v => ({ name: v.title.substring(0, 10), views: v.viewCount })).reverse() || [];
+  const topVideo = result?.stats?.leaders?.topVideo;
+
+  // НОВОЕ: Логика калькулятора доходов
+  const viewsPerDay = result?.stats?.averages?.viewsPerDay || 0;
+  const monthlyViews = viewsPerDay * 30;
+  const revMin = formatNumber(Math.round((monthlyViews / 1000) * 1.0)); // $1 за 1000
+  const revMax = formatNumber(Math.round((monthlyViews / 1000) * 3.5)); // $3.5 за 1000
 
   if (isRegistering) {
     return (
       <main className="page-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        <div className="panel" style={{ width: '400px', textAlign: 'center', border: '2px solid #ff7a50', padding: '40px' }}>
+        <div className="panel" style={{ width: '420px', textAlign: 'center', border: '2px solid #ff7a50', padding: '40px' }}>
           <span style={{ fontSize: '50px' }}>{regAvatar}</span>
           <h2>Создать профиль PRO</h2>
           <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '25px' }}>
@@ -140,31 +155,30 @@ export default function HomePage() {
     );
   }
 
-  const coverage = result?.stats?.coverage;
-  const topVideo = result?.stats?.leaders?.topVideo;
-
   return (
     <main className="page-shell">
+      {/* ПАНЕЛЬ ПРОФИЛЯ */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', padding: '15px 30px', background: '#fff', borderRadius: '15px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
            <span style={{ fontSize: '32px' }}>{user?.avatar}</span>
            <div><div style={{ fontWeight: 'bold', fontSize: '18px', color: '#000' }}>{user?.name}</div><div style={{ fontSize: '11px', color: '#22c55e' }}>● PRO ACCOUNT</div></div>
         </div>
         <div style={{ display: 'flex', gap: '20px' }}>
-          <a href="#extension" style={{ color: '#ff7a50', textDecoration: 'none', fontWeight: 'bold' }}>УСТАНОВИТЬ РАСШИРЕНИЕ</a>
-          <button onClick={() => {localStorage.removeItem("channel_scope_user"); location.reload();}} style={{ color: '#999', border: 'none', background: 'none', cursor: 'pointer' }}>ВЫЙТИ</button>
+          <a href="#extension" style={{ color: '#ff7a50', textDecoration: 'none', fontWeight: 'bold', marginTop: '4px' }}>УСТАНОВИТЬ РАСШИРЕНИЕ</a>
+          <button onClick={handleLogout} style={{ color: '#999', border: 'none', background: 'none', cursor: 'pointer', fontWeight: 'bold' }}>ВЫЙТИ</button>
         </div>
       </header>
 
       <section className="hero">
         <h1 style={{ fontSize: '64px', fontWeight: '900', marginBottom: '15px' }}>Channel Scope</h1>
         <form className="hero-form" onSubmit={handleSubmit} style={{ maxWidth: '900px', margin: '0 auto 50px' }}>
-          <input type="text" value={channelUrl} onChange={(e) => setChannelUrl(e.target.value)} placeholder="Ссылка на канал..." style={{ padding: '18px', fontSize: '18px' }} />
+          <input type="text" value={channelUrl} onChange={(e) => setChannelUrl(e.target.value)} placeholder="Вставьте ссылку на канал..." style={{ padding: '18px', fontSize: '18px' }} />
           <button className="primary-button" type="submit" disabled={loading} style={{ padding: '0 40px' }}>
             {loading ? "Идет сбор данных..." : "Запустить полный аудит"}
           </button>
         </form>
 
+        {/* --- TITLE LAB --- */}
         <div className="panel" style={{ border: '2px solid #ff7a50', background: '#fff', padding: '40px', textAlign: 'left' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
             <h2 style={{ margin: 0 }}>Title Lab — Лаборатория заголовков</h2>
@@ -201,18 +215,23 @@ export default function HomePage() {
 
       {result && (
         <>
-          <section className="channel-header" style={result.channel.banner ? { backgroundImage: `linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.95)), url(${result.channel.banner})` } : {}}>
+          <section className="channel-header" style={result.channel.banner ? { backgroundImage: `linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.98)), url(${result.channel.banner})` } : {}}>
             <div className="channel-meta">
               {result.channel.thumbnail && <img className="channel-avatar" src={result.channel.thumbnail} alt="" />}
               <div><h2>{result.channel.title}</h2><p>{result.analysis.summary}</p></div>
             </div>
           </section>
 
-          <section className="metrics-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', marginTop: '40px' }}>
+          {/* НОВОЕ: КАЛЬКУЛЯТОР ДОХОДА И МЕТРИКИ */}
+          <section style={{ display: 'flex', gap: '20px', marginTop: '40px', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 300px', background: 'linear-gradient(135deg, #111, #222)', color: '#fff', padding: '30px', borderRadius: '15px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <span style={{ color: '#ff7a50', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '15px', display: 'block' }}>ОЦЕНКА ДОХОДА (В МЕСЯЦ)</span>
+              <div style={{ fontSize: '42px', fontWeight: '900', marginBottom: '10px' }}>${revMin} - ${revMax}</div>
+              <p style={{ color: '#aaa', fontSize: '14px', margin: 0 }}>Примерный расчет на основе {formatNumber(monthlyViews)} просмотров в месяц. Без учета рекламных интеграций.</p>
+            </div>
             <MetricCard label="ПОДПИСЧИКИ" value={formatNumber(result.channel.subscriberCount)} hint="Общая база лояльных зрителей." />
-            <MetricCard label="ПРОСМОТРЫ" value={formatNumber(result.channel.viewCount)} hint="Суммарный авторитет канала." />
-            <MetricCard label="СРЕДНИЕ" value={formatNumber(result.stats.averages.views)} hint="Средние просмотры на видео." />
-            <MetricCard label="ER (Engagement)" value={formatPercent(result.stats.averages.engagementRate)} hint="Показатель активности аудитории." />
+            <MetricCard label="СРЕДНИЕ ПРОСМОТРЫ" value={formatNumber(result.stats.averages.views)} hint="Ориентир охвата на одно видео." />
+            <MetricCard label="ER (ВОВЛЕЧЕННОСТЬ)" value={formatPercent(result.stats.averages.engagementRate)} hint="Показатель активности аудитории." />
           </section>
 
           <section className="panel" style={{ marginTop: '40px', padding: '40px' }}>
@@ -301,20 +320,25 @@ export default function HomePage() {
         </>
       )}
 
-    
-
-      {/* УСТАНОВКА РАСШИРЕНИЯ */}
+      {/* УСТАНОВКА РАСШИРЕНИЯ С КНОПКОЙ СКАЧИВАНИЯ */}
       <section id="extension" className="panel" style={{ marginTop: '80px', background: '#111', color: '#fff', padding: '50px', textAlign: 'center' }}>
         <h2 style={{ color: '#ff7a50', fontSize: '32px' }}>Установите расширение Pulse</h2>
         <p style={{ color: '#888', marginBottom: '40px' }}>Анализируйте видео прямо на YouTube в один клик.</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', textAlign: 'left', marginBottom: '40px' }}>
-          <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}><strong>Шаг 1.</strong> Скачайте архив ZIP.</div>
+          <div style={{ padding: '20px', background: '#222', borderRadius: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <strong style={{ color: '#ff7a50' }}>Шаг 1.</strong><br/>
+              <span style={{ fontSize: '14px', color: '#ccc' }}>Скачайте архив с расширением на свой ПК.</span>
+            </div>
+            <a href="/pulse-extension.zip" download style={{ display: 'block', background: '#ff7a50', color: '#fff', textDecoration: 'none', padding: '10px', borderRadius: '6px', marginTop: '15px', fontWeight: 'bold', textAlign: 'center' }}>
+              Скачать .ZIP
+            </a>
+          </div>
           <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}><strong>Шаг 2.</strong> Включите Режим разработчика в chrome://extensions.</div>
           <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}><strong>Шаг 3.</strong> Загрузите распакованную папку.</div>
         </div>
         <div style={{ padding: '20px', border: '1px dashed #444', borderRadius: '10px' }}>
           <p>Ваш персональный код для расширения:</p>
-          {/* ВОТ ЗДЕСЬ ИСПРАВЛЕНИЕ: добавил знак вопроса user?.code */}
           <code style={{ fontSize: '24px', color: '#ff7a50' }}>{user?.code || "Код не найден"}</code>
         </div>
       </section>
