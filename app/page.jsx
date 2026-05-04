@@ -84,13 +84,29 @@ export default function HomePage() {
     }
   };
 
-  const handleRegister = async (e) => {
+ const handleRegister = async (e) => {
     e.preventDefault();
     if (!regName || !regCode) return alert("Заполни поля!");
+
+    // 1. Сначала проверяем код на сервере
+    const res = await fetch("/api/verify-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: regCode })
+    });
+
+    if (!res.ok) {
+      alert("Неверный код доступа!");
+      return;
+    }
+
+    // 2. Если код верный, создаем профиль
     const userData = { name: regName, avatar: regAvatar, code: regCode, telegramId: "" };
     await setDoc(doc(db, "users", regCode), userData);
     localStorage.setItem("yt_access_code", regCode);
-    setUser(userData); loadRadar(regCode);
+    setUser(userData);
+    setIsRegistering(false);
+    loadRadar(regCode);
   };
 
   const handleLogin = async (e) => {
