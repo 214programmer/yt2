@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { db } from "@/lib/firebase"; // Убедись, что файл lib/firebase.js создан
+import { doc, getDoc, setDoc, collection, addDoc, getDocs, deleteDoc } from "firebase/firestore";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const EXAMPLES = [
@@ -24,23 +26,25 @@ function formatDuration(seconds) {
   return h > 0 ? `${h}ч ${m}м` : `${m}м ${s}с`;
 }
 
+// Улучшенная карточка метрик
 function MetricCard({ label, value, hint }) {
   return (
-    <article className="metric-card" style={{ flex: '1 1 250px', textAlign: 'left', padding: '30px', background: '#fff', borderRadius: '15px', border: '1px solid #eee' }}>
+    <article className="metric-card" style={{ flex: '1 1 280px', textAlign: 'left', padding: '30px', background: '#fff', borderRadius: '15px', border: '1px solid #eee' }}>
       <span className="eyebrow" style={{ fontSize: '11px', letterSpacing: '1.5px', color: '#ff7a50', fontWeight: 'bold' }}>{label}</span>
-      <strong style={{ fontSize: '36px', display: 'block', margin: '15px 0' }}>{value}</strong>
-      <p style={{ fontSize: '14px', color: '#666', lineHeight: '1.6' }}>{hint}</p>
+      <strong style={{ fontSize: '32px', display: 'block', margin: '15px 0' }}>{value}</strong>
+      <p style={{ fontSize: '14px', color: '#555', lineHeight: '1.6' }}>{hint}</p>
     </article>
   );
 }
 
+// Красивый список
 function BulletList({ title, items }) {
   return (
     <div className="list-card" style={{ padding: '25px', width: '100%', background: '#fff', borderRadius: '15px', border: '1px solid #eee' }}>
       <h3 style={{ marginBottom: '20px', fontSize: '20px' }}>{title}</h3>
-      <ul style={{ display: 'flex', flexDirection: 'column', gap: '15px', paddingLeft: '20px' }}>
+      <ul style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
         {(items || []).map((item, idx) => (
-          <li key={idx} style={{ fontSize: '15px', lineHeight: '1.6', color: '#333' }}>{item}</li>
+          <li key={idx} style={{ fontSize: '15.5px', lineHeight: '1.7', color: '#333' }}>{item}</li>
         ))}
       </ul>
     </div>
@@ -48,6 +52,12 @@ function BulletList({ title, items }) {
 }
 
 export default function HomePage() {
+  const [user, setUser] = useState(null);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [regName, setRegName] = useState("");
+  const [regCode, setRegCode] = useState("");
+  const [regAvatar, setRegAvatar] = useState(AVATARS[0]);
+
   const [channelUrl, setChannelUrl] = useState(EXAMPLES[0]);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -55,41 +65,69 @@ export default function HomePage() {
   const [planDetails, setPlanDetails] = useState(null);
   const [planLoading, setPlanLoading] = useState(false);
 
-  // Аккаунт
-  const [user, setUser] = useState(null);
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [regName, setRegName] = useState("");
-  const [regCode, setRegCode] = useState("");
-  const [regAvatar, setRegAvatar] = useState(AVATARS[0]);
-
-  // Title Lab
   const [testTitle, setTestTitle] = useState("");
   const [titleResult, setTitleResult] = useState(null);
   const [titleLoading, setTitleLoading] = useState(false);
 
+  const [radar, setRadar] = useState([]);
+  const [radarInput, setRadarInput] = useState("");
+
+  // 1. ПРОВЕРКА ПРОФИЛЯ ПРИ ЗАГРУЗКЕ
   useEffect(() => {
-    const savedUser = localStorage.getItem("channel_scope_user");
-    if (savedUser) setUser(JSON.parse(savedUser)); else setIsRegistering(true);
+    const checkUser = async () => {
+      const savedCode = localStorage.getItem("yt_access_code");
+      if (savedCode) {
+        const docRef = doc(db, "users", savedCode);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setUser(docSnap.data());
+          loadRadar(savedCode);
+        } else { setIsRegistering(true); }
+      } else { setIsRegistering(true); }
+    };
+    checkUser();
   }, []);
 
-  const handleRegister = (e) => {
+  // 2. РЕГИСТРАЦИЯ
+  const handleRegister = async (e) => {
     e.preventDefault();
     if (!regName || !regCode) return;
-    const newUser = { name: regName, avatar: regAvatar, code: regCode };
-    localStorage.setItem("channel_scope_user", JSON.stringify(newUser));
-    setUser(newUser); setIsRegistering(false);
+    const userData = { name: regName, avatar: regAvatar, code: regCode };
+    await setDoc(doc(db, "users", regCode), userData);
+    localStorage.setItem("yt_access_code", regCode);
+    setUser(userData);
+    setIsRegistering(false);
+    loadRadar(regCode);
   };
 
   const handleLogout = () => {
-    if(confirm("Выйти из профиля?")) {
-      localStorage.removeItem("channel_scope_user");
-      setUser(null); setIsRegistering(true);
+    if(confirm("Выйти и очистить кэш?")) {
+      localStorage.removeItem("yt_access_code");
+      location.reload();
     }
   };
 
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setLoading(true); setError(""); setResult(null); setPlanDetails(null);
+  // 3. РАДАР (Firebase)
+  const loadRadar = async (code) => {
+    const q = await getDocs(collection(db, "users", code, "radar"));
+    setRadar(q.docs.map(d => ({ id: d.id, ...d.data() })));
+  };
+
+  const addToRadar = async () => {
+    if (!radarInput) return;
+    const docRef = await addDoc(collection(db, "users", user.code, "radar"), { url: radarInput, addedAt: new Date() });
+    setRadar([...radar, { id: docRef.id, url: radarInput }]);
+    setRadarInput("");
+  };
+
+  const deleteFromRadar = async (id) => {
+    await deleteDoc(doc(db, "users", user.code, "radar", id));
+    setRadar(radar.filter(i => i.id !== id));
+  };
+
+  // 4. АНАЛИЗ
+  async function handleSubmit(e) {
+    e.preventDefault(); setLoading(true); setError(""); setResult(null); setPlanDetails(null);
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -97,14 +135,13 @@ export default function HomePage() {
         body: JSON.stringify({ channelUrl, accessCode: user.code }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка аудита");
+      if (!res.ok) throw new Error(data.error || "Ошибка");
       setResult(data);
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   }
 
   async function handleCheckTitle(e) {
-    e.preventDefault();
-    setTitleLoading(true); setTitleResult(null);
+    e.preventDefault(); setTitleLoading(true); setTitleResult(null);
     try {
       const res = await fetch("/api/check-title", {
         method: "POST",
@@ -112,12 +149,12 @@ export default function HomePage() {
         body: JSON.stringify({ title: testTitle, accessCode: user.code }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка AI");
       setTitleResult(data);
-    } catch (err) { alert(err.message); } finally { setTitleLoading(false); }
+    } catch (err) { alert("Ошибка AI"); } finally { setTitleLoading(false); }
   }
 
   async function handlePlanDetails() {
+    if (!result) return;
     setPlanLoading(true);
     try {
       const res = await fetch("/api/plan-details", {
@@ -127,82 +164,101 @@ export default function HomePage() {
       });
       const data = await res.json();
       setPlanDetails(data);
-    } catch (err) { alert("Ошибка фаз"); } finally { setPlanLoading(false); }
+    } catch (err) { alert("Ошибка при генерации"); } finally { setPlanLoading(false); }
   }
-
-  const chartData = result?.videos?.map(v => ({ name: v.title.substring(0, 10), views: v.viewCount })).reverse() || [];
-  const topVideo = result?.stats?.leaders?.topVideo;
-
-  // НОВОЕ: Логика калькулятора доходов
-  const viewsPerDay = result?.stats?.averages?.viewsPerDay || 0;
-  const monthlyViews = viewsPerDay * 30;
-  const revMin = formatNumber(Math.round((monthlyViews / 1000) * 1.0)); // $1 за 1000
-  const revMax = formatNumber(Math.round((monthlyViews / 1000) * 3.5)); // $3.5 за 1000
 
   if (isRegistering) {
     return (
       <main className="page-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
         <div className="panel" style={{ width: '420px', textAlign: 'center', border: '2px solid #ff7a50', padding: '40px' }}>
-          <span style={{ fontSize: '50px' }}>{regAvatar}</span>
-          <h2>Создать профиль PRO</h2>
+          <span style={{ fontSize: '50px' }}>🚀</span>
+          <h2>Вход в PRO Систему</h2>
           <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '25px' }}>
-            <input type="text" placeholder="Имя" className="hero-form input" style={{ padding: '15px', borderRadius: '10px', border: '1px solid #ddd', color: '#000' }} value={regName} onChange={(e) => setRegName(e.target.value)} />
-            <input type="password" placeholder="Код доступа" className="hero-form input" style={{ padding: '15px', borderRadius: '10px', border: '1px solid #ddd', color: '#000' }} value={regCode} onChange={(e) => setRegCode(e.target.value)} />
-            <button className="primary-button" type="submit">Начать работу</button>
+            <input type="text" placeholder="Имя профиля" style={{ padding: '15px', borderRadius: '10px', border: '1px solid #ddd' }} value={regName} onChange={(e) => setRegName(e.target.value)} />
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+              {AVATARS.map(a => <button key={a} type="button" onClick={() => setRegAvatar(a)} style={{ fontSize: '24px', background: regAvatar === a ? '#fff1ed' : 'transparent', border: 'none', cursor: 'pointer' }}>{a}</button>)}
+            </div>
+            <input type="password" placeholder="Код администратора" style={{ padding: '15px', borderRadius: '10px', border: '1px solid #ddd' }} value={regCode} onChange={(e) => setRegCode(e.target.value)} />
+            <button className="primary-button" type="submit">Войти / Создать</button>
           </form>
         </div>
       </main>
     );
   }
 
+  const chartData = result?.videos?.map(v => ({ name: v.title.substring(0, 10), views: v.viewCount })).reverse() || [];
+  const topVideo = result?.stats?.leaders?.topVideo;
+  
+  // Доход
+  const viewsPerDay = result?.stats?.averages?.viewsPerDay || 0;
+  const monthlyViews = viewsPerDay * 30;
+  const revMin = formatNumber(Math.round((monthlyViews / 1000) * 1.0));
+  const revMax = formatNumber(Math.round((monthlyViews / 1000) * 3.5));
+
   return (
     <main className="page-shell">
-      {/* ПАНЕЛЬ ПРОФИЛЯ */}
+      {/* ШАПКА */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', padding: '15px 30px', background: '#fff', borderRadius: '15px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
            <span style={{ fontSize: '32px' }}>{user?.avatar}</span>
-           <div><div style={{ fontWeight: 'bold', fontSize: '18px', color: '#000' }}>{user?.name}</div><div style={{ fontSize: '11px', color: '#22c55e' }}>● PRO ACCOUNT</div></div>
+           <div><div style={{ fontWeight: 'bold', fontSize: '18px' }}>{user?.name}</div><div style={{ fontSize: '11px', color: '#22c55e' }}>● CLOUD PRO ACTIVE</div></div>
         </div>
         <div style={{ display: 'flex', gap: '20px' }}>
-          <a href="#extension" style={{ color: '#ff7a50', textDecoration: 'none', fontWeight: 'bold', marginTop: '4px' }}>УСТАНОВИТЬ РАСШИРЕНИЕ</a>
-          <button onClick={handleLogout} style={{ color: '#999', border: 'none', background: 'none', cursor: 'pointer', fontWeight: 'bold' }}>ВЫЙТИ</button>
+           <a href="#extension" style={{ color: '#ff7a50', textDecoration: 'none', fontWeight: 'bold', fontSize: '14px' }}>РАСШИРЕНИЕ PULSE 📥</a>
+           <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer' }}>ВЫЙТИ</button>
         </div>
       </header>
 
       <section className="hero">
-        <h1 style={{ fontSize: '64px', fontWeight: '900', marginBottom: '15px' }}>Channel Scope</h1>
-        <form className="hero-form" onSubmit={handleSubmit} style={{ maxWidth: '900px', margin: '0 auto 50px' }}>
-          <input type="text" value={channelUrl} onChange={(e) => setChannelUrl(e.target.value)} placeholder="Вставьте ссылку на канал..." style={{ padding: '18px', fontSize: '18px' }} />
-          <button className="primary-button" type="submit" disabled={loading} style={{ padding: '0 40px' }}>
-            {loading ? "Идет сбор данных..." : "Запустить полный аудит"}
-          </button>
+        <h1 style={{ fontSize: '64px', fontWeight: '900' }}>Channel Scope</h1>
+        
+        <form className="hero-form" onSubmit={handleSubmit} style={{ margin: '40px 0' }}>
+          <input type="text" value={channelUrl} onChange={(e) => setChannelUrl(e.target.value)} placeholder="Ссылка на YouTube канал..." />
+          <button className="primary-button" type="submit" disabled={loading}>{loading ? "..." : "Полный аудит"}</button>
         </form>
 
-        {/* --- TITLE LAB --- */}
+        {/* РАДАР КОНКУРЕНТОВ */}
+        <div className="panel" style={{ marginBottom: '40px', textAlign: 'left', background: '#fcfcfc' }}>
+           <h3 style={{ marginBottom: '15px' }}>📡 Мой Радар (Облачное отслеживание)</h3>
+           <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+              <input type="text" placeholder="Ссылка на конкурента..." style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #eee' }} value={radarInput} onChange={(e) => setRadarInput(e.target.value)} />
+              <button onClick={addToRadar} className="primary-button" style={{ margin: 0, padding: '0 30px' }}>Добавить</button>
+           </div>
+           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              {radar.map(item => (
+                <div key={item.id} style={{ background: '#fff', padding: '10px 20px', borderRadius: '25px', border: '1px solid #ddd', fontSize: '13px', display: 'flex', gap: '15px', alignItems: 'center' }}>
+                  <strong>{item.url.split('@')[1] || item.url}</strong>
+                  <button onClick={() => deleteFromRadar(item.id)} style={{ border: 'none', background: 'none', color: 'red', cursor: 'pointer', fontWeight: 'bold' }}>×</button>
+                </div>
+              ))}
+           </div>
+        </div>
+
+        {/* TITLE LAB */}
         <div className="panel" style={{ border: '2px solid #ff7a50', background: '#fff', padding: '40px', textAlign: 'left' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
-            <h2 style={{ margin: 0 }}>Title Lab — Лаборатория заголовков</h2>
-            <span className="eyebrow" style={{ color: '#ff7a50', fontWeight: 'bold' }}>10 ВАРИАНТОВ</span>
+            <h2 style={{ margin: 0 }}>Title Lab — Анализ кликабельности</h2>
+            <span className="eyebrow" style={{ color: '#ff7a50', fontWeight: 'bold' }}>10 AI ВАРИАНТОВ</span>
           </div>
           <form onSubmit={handleCheckTitle} style={{ display: 'flex', gap: '15px', marginBottom: '30px' }}>
-            <input type="text" style={{ flex: 1, padding: '15px', borderRadius: '10px', border: '1px solid #ddd', fontSize: '18px', color: '#000' }} placeholder="Введите заголовок ролика..." value={testTitle} onChange={(e) => setTestTitle(e.target.value)} />
-            <button className="primary-button" type="submit" disabled={titleLoading} style={{ margin: 0, padding: '0 40px' }}>{titleLoading ? "..." : "Оценить"}</button>
+            <input type="text" style={{ flex: 1, padding: '15px', borderRadius: '10px', border: '1px solid #ddd', fontSize: '18px', color: '#000' }} placeholder="Введи заголовок ролика..." value={testTitle} onChange={(e) => setTestTitle(e.target.value)} />
+            <button className="primary-button" type="submit" disabled={titleLoading}>{titleLoading ? "..." : "Оценить"}</button>
           </form>
           {titleResult && (
-            <div style={{ background: '#fcfcfc', padding: '35px', borderRadius: '15px', border: '1px solid #eee' }}>
-              <div style={{ display: 'flex', gap: '40px', alignItems: 'center', marginBottom: '40px' }}>
+            <div style={{ background: '#f9f9f9', padding: '30px', borderRadius: '15px' }}>
+              <div style={{ display: 'flex', gap: '40px', alignItems: 'center', marginBottom: '30px' }}>
                 <div style={{ fontSize: '72px', fontWeight: '900', color: titleResult.score > 70 ? '#22c55e' : '#f59e0b' }}>{titleResult.score}%</div>
-                <div style={{ flex: 1 }}><p style={{ fontSize: '17px', lineHeight: '1.6', color: '#333' }}>{titleResult.analysis}</p></div>
+                <div style={{ flex: 1 }}><p style={{ fontSize: '18px', lineHeight: '1.6' }}>{titleResult.analysis}</p></div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                 <BulletList title="Сильные стороны (Плюсы)" items={titleResult.pros} />
-                 <BulletList title="Критические недочеты (Минусы)" items={titleResult.cons} />
+                 <BulletList title="Сильные стороны" items={titleResult.pros} />
+                 <BulletList title="Критические недочеты" items={titleResult.cons} />
               </div>
-              <div style={{ marginTop: '40px', padding: '30px', background: '#fff', border: '1px solid #ff7a50', borderRadius: '15px' }}>
-                <h4 style={{ color: '#ff7a50', marginBottom: '20px', fontSize: '18px' }}>10 AI-вариантов (Нажми для копирования)</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+              <div className="list-card" style={{ width: '100%', border: '1px solid #ff7a50', marginTop: '30px' }}>
+                <h3 style={{ color: '#ff7a50' }}>10 улучшенных вариантов (Кликни для копирования)</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '20px' }}>
                   {titleResult.improvements.map((v, i) => (
-                    <div key={i} onClick={() => {navigator.clipboard.writeText(v); alert('Скопировано!');}} style={{ padding: '15px', background: '#fff8f6', border: '1px dashed #ff7a50', borderRadius: '10px', cursor: 'pointer', fontSize: '15px', color: '#000' }}>{v}</div>
+                    <div key={i} onClick={() => {navigator.clipboard.writeText(v); alert('Скопировано!');}} style={{ padding: '12px', background: '#fff', border: '1px dashed #ff7a50', borderRadius: '10px', cursor: 'pointer', fontSize: '14px' }}>{v}</div>
                   ))}
                 </div>
               </div>
@@ -215,27 +271,21 @@ export default function HomePage() {
 
       {result && (
         <>
-          <section className="channel-header" style={result.channel.banner ? { backgroundImage: `linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.98)), url(${result.channel.banner})` } : {}}>
-            <div className="channel-meta">
-              {result.channel.thumbnail && <img className="channel-avatar" src={result.channel.thumbnail} alt="" />}
-              <div><h2>{result.channel.title}</h2><p>{result.analysis.summary}</p></div>
-            </div>
-          </section>
-
-          {/* НОВОЕ: КАЛЬКУЛЯТОР ДОХОДА И МЕТРИКИ */}
+          {/* КАЛЬКУЛЯТОР + МЕТРИКИ */}
           <section style={{ display: 'flex', gap: '20px', marginTop: '40px', flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 300px', background: 'linear-gradient(135deg, #111, #222)', color: '#fff', padding: '30px', borderRadius: '15px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <span style={{ color: '#ff7a50', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '15px', display: 'block' }}>ОЦЕНКА ДОХОДА (В МЕСЯЦ)</span>
+              <span style={{ color: '#ff7a50', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '15px' }}>ОЦЕНКА ДОХОДА (В МЕСЯЦ)</span>
               <div style={{ fontSize: '42px', fontWeight: '900', marginBottom: '10px' }}>${revMin} - ${revMax}</div>
-              <p style={{ color: '#aaa', fontSize: '14px', margin: 0 }}>Примерный расчет на основе {formatNumber(monthlyViews)} просмотров в месяц. Без учета рекламных интеграций.</p>
+              <p style={{ color: '#aaa', fontSize: '13px' }}>На основе {formatNumber(monthlyViews)} просмотров в месяц. Без учета рекламы.</p>
             </div>
-            <MetricCard label="ПОДПИСЧИКИ" value={formatNumber(result.channel.subscriberCount)} hint="Общая база лояльных зрителей." />
-            <MetricCard label="СРЕДНИЕ ПРОСМОТРЫ" value={formatNumber(result.stats.averages.views)} hint="Ориентир охвата на одно видео." />
-            <MetricCard label="ER (ВОВЛЕЧЕННОСТЬ)" value={formatPercent(result.stats.averages.engagementRate)} hint="Показатель активности аудитории." />
+            <MetricCard label="ПОДПИСЧИКИ" value={formatNumber(result.channel.subscriberCount)} hint="Лояльная база канала." />
+            <MetricCard label="СРЕДНИЕ" value={formatNumber(result.stats.averages.views)} hint="Планка охвата на видео." />
+            <MetricCard label="ER ( engagement )" value={formatPercent(result.stats.averages.engagementRate)} hint="Активность аудитории." />
           </section>
 
+          {/* ГРАФИК */}
           <section className="panel" style={{ marginTop: '40px', padding: '40px' }}>
-            <h3>Динамика просмотров (60 видео)</h3>
+            <h3>Динамика просмотров (последние 60 видео)</h3>
             <div style={{ width: '100%', height: 400 }}>
               <ResponsiveContainer>
                 <AreaChart data={chartData}>
@@ -248,37 +298,40 @@ export default function HomePage() {
             </div>
           </section>
 
+          {/* АУДИТ */}
           <section className="list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginTop: '40px' }}>
             <BulletList title="Преимущества" items={result.analysis.channelAudit.strengths} />
             <BulletList title="Недочеты" items={result.analysis.channelAudit.weaknesses} />
             <BulletList title="Что залетает" items={result.analysis.contentPatterns.winningFormats} />
-            <BulletList title="Что тянет вниз" items={result.analysis.contentPatterns.underperformingPatterns} />
+            <BulletList title="Тянет вниз" items={result.analysis.contentPatterns.underperformingPatterns} />
           </section>
 
+          {/* ТОП ВИДЕО */}
           {topVideo && (
             <section className="spotlight" style={{ marginTop: '40px' }}>
               <div className="spotlight-main">
-                <span className="eyebrow">Топ видео</span><h3>{topVideo.title}</h3>
-                <a className="inline-link" href={topVideo.url} target="_blank" rel="noreferrer" style={{ fontSize: '18px' }}>Открыть видео ↗</a>
+                <span className="eyebrow">Самое популярное</span><h3>{topVideo.title}</h3>
+                <a className="inline-link" href={topVideo.url} target="_blank" rel="noreferrer">Смотреть на YouTube ↗</a>
               </div>
               <div className="spotlight-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-                <BulletList title="Почему выстрелило" items={result.analysis.topVideoBreakdown.whyItWorked} />
+                <BulletList title="Почему выстрелил" items={result.analysis.topVideoBreakdown.whyItWorked} />
                 <BulletList title="Что повторить" items={result.analysis.topVideoBreakdown.replicableElements} />
               </div>
             </section>
           )}
 
+          {/* КОНКУРЕНТЫ */}
           <section className="panel" style={{ marginTop: '40px', padding: '40px' }}>
             <h3>Конкурентная разведка</h3>
             <div className="competitor-grid" style={{ marginTop: '30px' }}>
               {result.analysis.competitorTakeaways.videos.map((v) => (
                 <article key={v.videoId} className="competitor-card" style={{ padding: '25px', background: '#fff', borderRadius: '15px', border: '1px solid #eee' }}>
-                  <a href={v.url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: '#ff7a50', fontWeight: 'bold', fontSize: '19px', display: 'block', marginBottom: '10px' }}>{v.title} ↗</a>
+                  <a href={v.url} target="_blank" rel="noreferrer" style={{ color: '#ff7a50', fontWeight: 'bold', fontSize: '19px', textDecoration: 'none' }}>{v.title} ↗</a>
                   <p className="muted">Канал: {v.channelTitle}</p>
                   <div style={{ marginTop: '15px' }}>
                     <strong>Почему залетело:</strong>
                     <ul style={{ paddingLeft: '20px' }}>{v.whyItPopped.map((i, idx) => <li key={idx}>{i}</li>)}</ul>
-                    <strong>Адаптация:</strong>
+                    <strong>Идеи адаптации:</strong>
                     <ul style={{ paddingLeft: '20px' }}>{v.ideasToAdapt.map((i, idx) => <li key={idx}>{i}</li>)}</ul>
                   </div>
                 </article>
@@ -286,6 +339,7 @@ export default function HomePage() {
             </div>
           </section>
 
+          {/* ПЛАН РОСТА */}
           <section className="panel" style={{ marginTop: '40px', padding: '40px' }}>
             <h3>План на 30 дней</h3>
             <div className="list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '30px', marginTop: '30px' }}>
@@ -295,24 +349,24 @@ export default function HomePage() {
             </div>
             <div style={{ textAlign: 'center', marginTop: '40px' }}>
               <button className="secondary-button" onClick={handlePlanDetails} disabled={planLoading} style={{ padding: '15px 50px' }}>
-                {planLoading ? "AI прорабатывает детали..." : "Раскрыть подробный пошаговый план"}
+                {planLoading ? "AI прорабатывает детали..." : "Раскрыть пошаговый план выполнения"}
               </button>
             </div>
             {planDetails && (
               <div className="details-panel" style={{ marginTop: '50px', background: '#f5f7fa', padding: '40px', borderRadius: '20px' }}>
-                <h3 style={{ marginBottom: '30px' }}>Инструкция (Фазы 1-4)</h3>
+                <h3 style={{ marginBottom: '30px' }}>Инструкция по реализации (Фазы 1-4)</h3>
                 <div className="phase-list" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px', marginBottom: '40px' }}>
                   {planDetails?.details?.phases?.map((p, i) => (
                     <article className="phase-card" key={i} style={{ padding: '25px', background: '#fff', borderRadius: '15px' }}>
-                      <h4 style={{ color: '#ff7a50' }}>{i+1}. {p.title}</h4>
-                      <p style={{ fontSize: '14px' }}>{p.objective}</p>
-                      <strong style={{ fontSize: '13px' }}>Результат: {p.deliverable}</strong>
+                      <h4 style={{ color: '#ff7a50', margin: '0 0 10px 0' }}>{i+1}. {p.title}</h4>
+                      <p style={{ fontSize: '14px', color: '#555' }}>{p.objective}</p>
+                      <strong style={{ fontSize: '13px', color: '#ff7a50' }}>Результат: {p.deliverable}</strong>
                     </article>
                   ))}
                 </div>
                 <div className="list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-                   <BulletList title="Чек-лист" items={planDetails?.details?.checklist} />
-                   <BulletList title="Метрики" items={planDetails?.details?.metricsToWatch} />
+                   <BulletList title="Чек-лист выполнения" items={planDetails?.details?.checklist} />
+                   <BulletList title="Метрики контроля" items={planDetails?.details?.metricsToWatch} />
                 </div>
               </div>
             )}
@@ -320,27 +374,25 @@ export default function HomePage() {
         </>
       )}
 
-      {/* УСТАНОВКА РАСШИРЕНИЯ С КНОПКОЙ СКАЧИВАНИЯ */}
+      {/* УСТАНОВКА РАСШИРЕНИЯ */}
       <section id="extension" className="panel" style={{ marginTop: '80px', background: '#111', color: '#fff', padding: '50px', textAlign: 'center' }}>
         <h2 style={{ color: '#ff7a50', fontSize: '32px' }}>Установите расширение Pulse</h2>
-        <p style={{ color: '#888', marginBottom: '40px' }}>Анализируйте видео прямо на YouTube в один клик.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', textAlign: 'left', marginBottom: '40px' }}>
-          <div style={{ padding: '20px', background: '#222', borderRadius: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <strong style={{ color: '#ff7a50' }}>Шаг 1.</strong><br/>
-              <span style={{ fontSize: '14px', color: '#ccc' }}>Скачайте архив с расширением на свой ПК.</span>
-            </div>
-            <a href="/pulse-extension.zip" download style={{ display: 'block', background: '#ff7a50', color: '#fff', textDecoration: 'none', padding: '10px', borderRadius: '6px', marginTop: '15px', fontWeight: 'bold', textAlign: 'center' }}>
-              Скачать .ZIP
-            </a>
-          </div>
-          <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}><strong>Шаг 2.</strong> Включите Режим разработчика в chrome://extensions.</div>
-          <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}><strong>Шаг 3.</strong> Загрузите распакованную папку.</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', textAlign: 'left', marginBottom: '40px', marginTop: '30px' }}>
+           <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}>
+             <strong style={{ color: '#ff7a50' }}>Шаг 1.</strong><br/> Скачайте архив ZIP по кнопке ниже.
+           </div>
+           <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}>
+             <strong style={{ color: '#ff7a50' }}>Шаг 2.</strong><br/> Включите Режим разработчика в chrome://extensions.
+           </div>
+           <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}>
+             <strong style={{ color: '#ff7a50' }}>Шаг 3.</strong><br/> Нажмите Загрузить распакованную папку.
+           </div>
         </div>
         <div style={{ padding: '20px', border: '1px dashed #444', borderRadius: '10px' }}>
           <p>Ваш персональный код для расширения:</p>
           <code style={{ fontSize: '24px', color: '#ff7a50' }}>{user?.code || "Код не найден"}</code>
         </div>
+        <a href="/pulse-extension.zip" download style={{ display: 'inline-block', background: '#ff7a50', color: '#fff', textDecoration: 'none', padding: '15px 40px', borderRadius: '8px', marginTop: '30px', fontWeight: 'bold' }}>СКАЧАТЬ .ZIP</a>
       </section>
     </main>
   );
