@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-// Библиотека для графиков (убедись, что сделал npm install recharts)
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const EXAMPLES = [
@@ -25,7 +24,6 @@ function formatDuration(seconds) {
   return h > 0 ? `${h}ч ${m}м` : `${m}м ${s}с`;
 }
 
-// Широкая карточка метрик
 function MetricCard({ label, value, hint }) {
   return (
     <article className="metric-card" style={{ flex: '1 1 300px', textAlign: 'left', padding: '30px' }}>
@@ -36,7 +34,6 @@ function MetricCard({ label, value, hint }) {
   );
 }
 
-// Список
 function BulletList({ title, items }) {
   return (
     <div className="list-card" style={{ padding: '25px', width: '100%' }}>
@@ -58,7 +55,7 @@ export default function HomePage() {
   const [planDetails, setPlanDetails] = useState(null);
   const [planLoading, setPlanLoading] = useState(false);
 
-  // Аккаунт
+  // Состояния аккаунта
   const [user, setUser] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [regName, setRegName] = useState("");
@@ -83,13 +80,6 @@ export default function HomePage() {
     setUser(newUser); setIsRegistering(false);
   };
 
-  const handleLogout = () => {
-    if(confirm("Выйти из системы?")) {
-      localStorage.removeItem("channel_scope_user");
-      setUser(null); setIsRegistering(true);
-    }
-  };
-
   async function handleSubmit(event) {
     event.preventDefault();
     setLoading(true); setError(""); setResult(null); setPlanDetails(null);
@@ -107,7 +97,7 @@ export default function HomePage() {
 
   async function handleCheckTitle(e) {
     e.preventDefault();
-    setTitleLoading(true); setTitleResult(null);
+    setTitleLoading(true);
     try {
       const res = await fetch("/api/check-title", {
         method: "POST",
@@ -115,41 +105,29 @@ export default function HomePage() {
         body: JSON.stringify({ title: testTitle, accessCode: user.code }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка AI");
       setTitleResult(data);
     } catch (err) { alert(err.message); } finally { setTitleLoading(false); }
   }
 
   async function handlePlanDetails() {
-    if (!result) return;
     setPlanLoading(true);
     try {
       const res = await fetch("/api/plan-details", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          channel: result.channel,
-          stats: result.stats,
-          analysis: result.analysis,
-          accessCode: user.code 
-        }),
+        body: JSON.stringify({ ...result, accessCode: user.code }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка генерации");
       setPlanDetails(data);
-    } catch (err) { alert(err.message); } finally { setPlanLoading(false); }
+    } catch (err) { alert("Ошибка при генерации фаз"); } finally { setPlanLoading(false); }
   }
 
-  // Данные для графика
-  const chartData = result?.videos?.map(v => ({
-    name: v.title.substring(0, 15),
-    views: v.viewCount,
-  })).reverse() || [];
+  const chartData = result?.videos?.map(v => ({ name: v.title.substring(0, 10), views: v.viewCount })).reverse() || [];
 
   if (isRegistering) {
     return (
       <main className="page-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        <div className="panel" style={{ width: '420px', textAlign: 'center', border: '2px solid #ff7a50', padding: '40px' }}>
+        <div className="panel" style={{ width: '400px', textAlign: 'center', border: '2px solid #ff7a50', padding: '40px' }}>
           <span style={{ fontSize: '50px' }}>{regAvatar}</span>
           <h2>Создать профиль PRO</h2>
           <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '25px' }}>
@@ -162,39 +140,37 @@ export default function HomePage() {
     );
   }
 
+  const coverage = result?.stats?.coverage;
   const topVideo = result?.stats?.leaders?.topVideo;
 
   return (
     <main className="page-shell">
-      {/* ПАНЕЛЬ ПРОФИЛЯ */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', padding: '15px 30px', background: '#fff', borderRadius: '15px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
            <span style={{ fontSize: '32px' }}>{user?.avatar}</span>
            <div><div style={{ fontWeight: 'bold', fontSize: '18px', color: '#000' }}>{user?.name}</div><div style={{ fontSize: '11px', color: '#22c55e' }}>● PRO ACCOUNT</div></div>
         </div>
-        <button onClick={handleLogout} style={{ background: 'transparent', border: 'none', color: '#ff7a50', cursor: 'pointer', fontWeight: 'bold' }}>ВЫЙТИ</button>
+        <div style={{ display: 'flex', gap: '20px' }}>
+          <a href="#extension" style={{ color: '#ff7a50', textDecoration: 'none', fontWeight: 'bold' }}>УСТАНОВИТЬ РАСШИРЕНИЕ 📥</a>
+          <button onClick={() => {localStorage.removeItem("channel_scope_user"); location.reload();}} style={{ color: '#999', border: 'none', background: 'none', cursor: 'pointer' }}>ВЫЙТИ</button>
+        </div>
       </header>
 
       <section className="hero">
         <h1 style={{ fontSize: '64px', fontWeight: '900', marginBottom: '15px' }}>Channel Scope</h1>
-        <p style={{ fontSize: '19px', color: '#666', maxWidth: '800px', margin: '0 auto 40px' }}>Ваша персональная студия AI-аналитики для взрывного роста на YouTube.</p>
-
         <form className="hero-form" onSubmit={handleSubmit} style={{ maxWidth: '900px', margin: '0 auto 50px' }}>
-          <input type="text" value={channelUrl} onChange={(e) => setChannelUrl(e.target.value)} placeholder="Вставьте ссылку на канал..." style={{ padding: '18px', fontSize: '18px' }} />
-          <button className="primary-button" type="submit" disabled={loading} style={{ padding: '0 40px' }}>
-            {loading ? "Идет сбор данных..." : "Запустить полный аудит"}
-          </button>
+          <input type="text" value={channelUrl} onChange={(e) => setChannelUrl(e.target.value)} placeholder="Ссылка на канал..." />
+          <button className="primary-button" type="submit" disabled={loading}>{loading ? "..." : "Анализ"}</button>
         </form>
 
-        {/* --- ШИРОКАЯ TITLE LAB --- */}
         <div className="panel" style={{ border: '2px solid #ff7a50', background: '#fff', padding: '40px', textAlign: 'left' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
             <h2 style={{ margin: 0 }}>Title Lab — Лаборатория заголовков</h2>
             <span className="eyebrow" style={{ color: '#ff7a50', fontWeight: 'bold' }}>10 ВАРИАНТОВ</span>
           </div>
           <form onSubmit={handleCheckTitle} style={{ display: 'flex', gap: '15px', marginBottom: '30px' }}>
-            <input type="text" style={{ flex: 1, padding: '15px', borderRadius: '10px', border: '1px solid #ddd', fontSize: '18px', color: '#000' }} placeholder="Введите заголовок ролика..." value={testTitle} onChange={(e) => setTestTitle(e.target.value)} />
-            <button className="primary-button" type="submit" disabled={titleLoading} style={{ margin: 0, padding: '0 40px' }}>{titleLoading ? "..." : "Оценить"}</button>
+            <input type="text" style={{ flex: 1, padding: '15px', borderRadius: '10px', border: '1px solid #ddd', color: '#000' }} placeholder="Введите заголовок..." value={testTitle} onChange={(e) => setTestTitle(e.target.value)} />
+            <button className="primary-button" type="submit" disabled={titleLoading}>{titleLoading ? "..." : "Оценить"}</button>
           </form>
           {titleResult && (
             <div style={{ background: '#fcfcfc', padding: '35px', borderRadius: '15px', border: '1px solid #eee' }}>
@@ -203,11 +179,11 @@ export default function HomePage() {
                 <div style={{ flex: 1 }}><p style={{ fontSize: '17px', lineHeight: '1.6', color: '#333' }}>{titleResult.analysis}</p></div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                 <BulletList title="Сильные стороны (Плюсы)" items={titleResult.pros} />
-                 <BulletList title="Критические недочеты (Минусы)" items={titleResult.cons} />
+                 <BulletList title="Сильные стороны" items={titleResult.pros} />
+                 <BulletList title="Минусы" items={titleResult.cons} />
               </div>
               <div style={{ marginTop: '40px', padding: '30px', background: '#fff', border: '1px solid #ff7a50', borderRadius: '15px' }}>
-                <h4 style={{ color: '#ff7a50', marginBottom: '20px', fontSize: '18px' }}>10 AI-вариантов (Нажми для копирования)</h4>
+                <h4 style={{ color: '#ff7a50', marginBottom: '20px' }}>10 AI-вариантов (Нажми для копирования)</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                   {titleResult.improvements.map((v, i) => (
                     <div key={i} onClick={() => {navigator.clipboard.writeText(v); alert('Скопировано!');}} style={{ padding: '15px', background: '#fff8f6', border: '1px dashed #ff7a50', borderRadius: '10px', cursor: 'pointer', fontSize: '15px', color: '#000' }}>{v}</div>
@@ -219,11 +195,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {error && <div className="status-banner error">{error}</div>}
-
       {result && (
         <>
-          <section className="channel-header" style={result.channel.banner ? { backgroundImage: `linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.98)), url(${result.channel.banner})` } : {}}>
+          <section className="channel-header" style={result.channel.banner ? { backgroundImage: `linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.95)), url(${result.channel.banner})` } : {}}>
             <div className="channel-meta">
               {result.channel.thumbnail && <img className="channel-avatar" src={result.channel.thumbnail} alt="" />}
               <div><h2>{result.channel.title}</h2><p>{result.analysis.summary}</p></div>
@@ -231,10 +205,10 @@ export default function HomePage() {
           </section>
 
           <section className="metrics-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', marginTop: '40px' }}>
-            <MetricCard label="ПОДПИСЧИКИ" value={formatNumber(result.channel.subscriberCount)} hint="Огромная база лояльных зрителей, требующая регулярного удержания." />
-            <MetricCard label="ПРОСМОТРЫ" value={formatNumber(result.channel.viewCount)} hint="Суммарный авторитет канала за все время." />
-            <MetricCard label="СРЕДНИЕ" value={formatNumber(result.stats.averages.views)} hint="Ориентир охвата на одно видео." />
-            <MetricCard label="ER" value={formatPercent(result.stats.averages.engagementRate)} hint="Показатель вовлеченности аудитории." />
+            <MetricCard label="ПОДПИСЧИКИ" value={formatNumber(result.channel.subscriberCount)} hint="Общая база лояльных зрителей." />
+            <MetricCard label="ПРОСМОТРЫ" value={formatNumber(result.channel.viewCount)} hint="Суммарный авторитет канала." />
+            <MetricCard label="СРЕДНИЕ" value={formatNumber(result.stats.averages.views)} hint="Средние просмотры на видео." />
+            <MetricCard label="ER (Engagement)" value={formatPercent(result.stats.averages.engagementRate)} hint="Показатель активности." />
           </section>
 
           <section className="panel" style={{ marginTop: '40px', padding: '40px' }}>
@@ -254,18 +228,18 @@ export default function HomePage() {
           <section className="list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginTop: '40px' }}>
             <BulletList title="Преимущества" items={result.analysis.channelAudit.strengths} />
             <BulletList title="Недочеты" items={result.analysis.channelAudit.weaknesses} />
-            <BulletList title="Winning Formats" items={result.analysis.contentPatterns.winningFormats} />
-            <BulletList title="Underperforming" items={result.analysis.contentPatterns.underperformingPatterns} />
+            <BulletList title="Что 'залетает'" items={result.analysis.contentPatterns.winningFormats} />
+            <BulletList title="Что тянет вниз" items={result.analysis.contentPatterns.underperformingPatterns} />
           </section>
 
           {topVideo && (
             <section className="spotlight" style={{ marginTop: '40px' }}>
               <div className="spotlight-main">
                 <span className="eyebrow">Топ видео</span><h3>{topVideo.title}</h3>
-                <a className="inline-link" href={topVideo.url} target="_blank" rel="noreferrer">Смотреть на YouTube ↗</a>
+                <a className="inline-link" href={topVideo.url} target="_blank" rel="noreferrer" style={{ fontSize: '18px' }}>Открыть видео ↗</a>
               </div>
               <div className="spotlight-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-                <BulletList title="Почему выстрелило" items={result.analysis.topVideoBreakdown.whyItWorked} />
+                <BulletList title="Почему выстрелил" items={result.analysis.topVideoBreakdown.whyItWorked} />
                 <BulletList title="Что повторить" items={result.analysis.topVideoBreakdown.replicableElements} />
               </div>
             </section>
@@ -276,7 +250,7 @@ export default function HomePage() {
             <div className="competitor-grid" style={{ marginTop: '30px' }}>
               {result.analysis.competitorTakeaways.videos.map((v) => (
                 <article key={v.videoId} className="competitor-card" style={{ padding: '25px', background: '#fff', borderRadius: '15px', border: '1px solid #eee' }}>
-                  <a href={v.url} target="_blank" rel="noreferrer" style={{ color: '#ff7a50', fontWeight: 'bold', fontSize: '19px' }}>{v.title} ↗</a>
+                  <a href={v.url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: '#ff7a50', fontWeight: 'bold', fontSize: '19px', display: 'block', marginBottom: '10px' }}>{v.title} ↗</a>
                   <p className="muted">Канал: {v.channelTitle}</p>
                   <div style={{ marginTop: '15px' }}>
                     <strong>Почему залетело:</strong>
@@ -303,7 +277,7 @@ export default function HomePage() {
             </div>
             {planDetails && (
               <div className="details-panel" style={{ marginTop: '50px', background: '#f5f7fa', padding: '40px', borderRadius: '20px' }}>
-                <h3>Инструкция (Фазы 1-4)</h3>
+                <h3 style={{ marginBottom: '30px' }}>Инструкция (Фазы 1-4)</h3>
                 <div className="phase-list" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px', marginBottom: '40px' }}>
                   {planDetails?.details?.phases?.map((p, i) => (
                     <article className="phase-card" key={i} style={{ padding: '25px', background: '#fff', borderRadius: '15px' }}>
@@ -322,6 +296,21 @@ export default function HomePage() {
           </section>
         </>
       )}
+
+      {/* УСТАНОВКА РАСШИРЕНИЯ */}
+      <section id="extension" className="panel" style={{ marginTop: '80px', background: '#111', color: '#fff', padding: '50px', textAlign: 'center' }}>
+        <h2 style={{ color: '#ff7a50', fontSize: '32px' }}>Установите расширение Pulse</h2>
+        <p style={{ color: '#888', marginBottom: '40px' }}>Анализируйте видео прямо на YouTube в один клик.</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', textAlign: 'left', marginBottom: '40px' }}>
+          <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}><strong>Шаг 1.</strong> Скачайте архив ZIP.</div>
+          <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}><strong>Шаг 2.</strong> Включите 'Режим разработчика' в chrome://extensions.</div>
+          <div style={{ padding: '20px', background: '#222', borderRadius: '10px' }}><strong>Шаг 3.</strong> Загрузите распакованную папку.</div>
+        </div>
+        <div style={{ padding: '20px', border: '1px dashed #444', borderRadius: '10px' }}>
+          <p>Ваш персональный код для расширения:</p>
+          <code style={{ fontSize: '24px', color: '#ff7a50' }}>{user.code}</code>
+        </div>
+      </section>
     </main>
   );
 }
