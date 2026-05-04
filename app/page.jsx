@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-// Импорт компонентов для графика
+// Библиотека для графиков (убедись, что сделал npm install recharts)
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const EXAMPLES = [
@@ -25,7 +25,7 @@ function formatDuration(seconds) {
   return h > 0 ? `${h}ч ${m}м` : `${m}м ${s}с`;
 }
 
-// Улучшенная широкая карточка метрик
+// Широкая карточка метрик
 function MetricCard({ label, value, hint }) {
   return (
     <article className="metric-card" style={{ flex: '1 1 300px', textAlign: 'left', padding: '30px' }}>
@@ -36,7 +36,7 @@ function MetricCard({ label, value, hint }) {
   );
 }
 
-// Универсальный список
+// Список
 function BulletList({ title, items }) {
   return (
     <div className="list-card" style={{ padding: '25px', width: '100%' }}>
@@ -58,7 +58,7 @@ export default function HomePage() {
   const [planDetails, setPlanDetails] = useState(null);
   const [planLoading, setPlanLoading] = useState(false);
 
-  // Состояния аккаунта
+  // Аккаунт
   const [user, setUser] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [regName, setRegName] = useState("");
@@ -84,8 +84,10 @@ export default function HomePage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("channel_scope_user");
-    setUser(null); setIsRegistering(true);
+    if(confirm("Выйти из системы?")) {
+      localStorage.removeItem("channel_scope_user");
+      setUser(null); setIsRegistering(true);
+    }
   };
 
   async function handleSubmit(event) {
@@ -113,19 +115,27 @@ export default function HomePage() {
         body: JSON.stringify({ title: testTitle, accessCode: user.code }),
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка AI");
       setTitleResult(data);
     } catch (err) { alert(err.message); } finally { setTitleLoading(false); }
   }
 
   async function handlePlanDetails() {
+    if (!result) return;
     setPlanLoading(true);
     try {
       const res = await fetch("/api/plan-details", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...result, accessCode: user.code }),
+        body: JSON.stringify({ 
+          channel: result.channel,
+          stats: result.stats,
+          analysis: result.analysis,
+          accessCode: user.code 
+        }),
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка генерации");
       setPlanDetails(data);
     } catch (err) { alert(err.message); } finally { setPlanLoading(false); }
   }
@@ -152,7 +162,6 @@ export default function HomePage() {
     );
   }
 
-  const coverage = result?.stats?.coverage;
   const topVideo = result?.stats?.leaders?.topVideo;
 
   return (
@@ -183,29 +192,22 @@ export default function HomePage() {
             <h2 style={{ margin: 0 }}>Title Lab — Лаборатория заголовков</h2>
             <span className="eyebrow" style={{ color: '#ff7a50', fontWeight: 'bold' }}>10 ВАРИАНТОВ</span>
           </div>
-          
           <form onSubmit={handleCheckTitle} style={{ display: 'flex', gap: '15px', marginBottom: '30px' }}>
-            <input type="text" style={{ flex: 1, padding: '15px', borderRadius: '10px', border: '1px solid #ddd', fontSize: '18px', color: '#000' }} placeholder="Введите будущий заголовок ролика..." value={testTitle} onChange={(e) => setTestTitle(e.target.value)} />
+            <input type="text" style={{ flex: 1, padding: '15px', borderRadius: '10px', border: '1px solid #ddd', fontSize: '18px', color: '#000' }} placeholder="Введите заголовок ролика..." value={testTitle} onChange={(e) => setTestTitle(e.target.value)} />
             <button className="primary-button" type="submit" disabled={titleLoading} style={{ margin: 0, padding: '0 40px' }}>{titleLoading ? "..." : "Оценить"}</button>
           </form>
-
           {titleResult && (
             <div style={{ background: '#fcfcfc', padding: '35px', borderRadius: '15px', border: '1px solid #eee' }}>
               <div style={{ display: 'flex', gap: '40px', alignItems: 'center', marginBottom: '40px' }}>
                 <div style={{ fontSize: '72px', fontWeight: '900', color: titleResult.score > 70 ? '#22c55e' : '#f59e0b' }}>{titleResult.score}%</div>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ marginBottom: '10px' }}>Вердикт AI</h3>
-                  <p style={{ fontSize: '17px', lineHeight: '1.6', color: '#333' }}>{titleResult.analysis}</p>
-                </div>
+                <div style={{ flex: 1 }}><p style={{ fontSize: '17px', lineHeight: '1.6', color: '#333' }}>{titleResult.analysis}</p></div>
               </div>
-              
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                  <BulletList title="Сильные стороны (Плюсы)" items={titleResult.pros} />
                  <BulletList title="Критические недочеты (Минусы)" items={titleResult.cons} />
               </div>
-
               <div style={{ marginTop: '40px', padding: '30px', background: '#fff', border: '1px solid #ff7a50', borderRadius: '15px' }}>
-                <h4 style={{ color: '#ff7a50', marginBottom: '20px', fontSize: '18px' }}>10 улучшенных AI-вариантов (Нажми для копирования)</h4>
+                <h4 style={{ color: '#ff7a50', marginBottom: '20px', fontSize: '18px' }}>10 AI-вариантов (Нажми для копирования)</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                   {titleResult.improvements.map((v, i) => (
                     <div key={i} onClick={() => {navigator.clipboard.writeText(v); alert('Скопировано!');}} style={{ padding: '15px', background: '#fff8f6', border: '1px dashed #ff7a50', borderRadius: '10px', cursor: 'pointer', fontSize: '15px', color: '#000' }}>{v}</div>
@@ -221,78 +223,65 @@ export default function HomePage() {
 
       {result && (
         <>
-          {/* ШАПКА РЕЗУЛЬТАТОВ */}
           <section className="channel-header" style={result.channel.banner ? { backgroundImage: `linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.98)), url(${result.channel.banner})` } : {}}>
             <div className="channel-meta">
               {result.channel.thumbnail && <img className="channel-avatar" src={result.channel.thumbnail} alt="" />}
-              <div>
-                <h2>{result.channel.title}</h2>
-                <p style={{ fontSize: '17px', lineHeight: '1.6' }}>{result.analysis.summary}</p>
-              </div>
+              <div><h2>{result.channel.title}</h2><p>{result.analysis.summary}</p></div>
             </div>
           </section>
 
-          {/* ШИРОКИЕ МЕТРИКИ */}
           <section className="metrics-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', marginTop: '40px' }}>
-            <MetricCard label="ПОДПИСЧИКИ" value={formatNumber(result.channel.subscriberCount)} hint="База лояльных зрителей, требующая регулярного удержания через новые форматы." />
-            <MetricCard label="ПРОСМОТРЫ КАНАЛА" value={formatNumber(result.channel.viewCount)} hint="Общий авторитет канала за все время существования." />
-            <MetricCard label="СРЕДНИЕ ПРОСМОТРЫ" value={formatNumber(result.stats.averages.views)} hint="Средняя планка охвата одного ролика. Ориентир для новых запусков." />
-            <MetricCard label="СРЕДНИЙ ER" value={formatPercent(result.stats.averages.engagementRate)} hint="Показатель 'живости' аудитории: процент лайков и комментариев." />
+            <MetricCard label="ПОДПИСЧИКИ" value={formatNumber(result.channel.subscriberCount)} hint="Огромная база лояльных зрителей, требующая регулярного удержания." />
+            <MetricCard label="ПРОСМОТРЫ" value={formatNumber(result.channel.viewCount)} hint="Суммарный авторитет канала за все время." />
+            <MetricCard label="СРЕДНИЕ" value={formatNumber(result.stats.averages.views)} hint="Ориентир охвата на одно видео." />
+            <MetricCard label="ER" value={formatPercent(result.stats.averages.engagementRate)} hint="Показатель вовлеченности аудитории." />
           </section>
 
-          {/* ГРАФИК ПРОСМОТРОВ (ВМЕСТО ТАБЛИЦЫ) */}
           <section className="panel" style={{ marginTop: '40px', padding: '40px' }}>
-            <h3 style={{ marginBottom: '30px' }}>Динамика популярности контента (60 видео)</h3>
+            <h3>Динамика просмотров (60 видео)</h3>
             <div style={{ width: '100%', height: 400 }}>
               <ResponsiveContainer>
                 <AreaChart data={chartData}>
                   <defs><linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ff7a50" stopOpacity={0.8}/><stop offset="95%" stopColor="#ff7a50" stopOpacity={0}/></linearGradient></defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-                  <XAxis dataKey="name" hide />
-                  <YAxis stroke="#999" fontSize={12} />
-                  <Tooltip />
+                  <XAxis dataKey="name" hide /><YAxis stroke="#999" fontSize={12} /><Tooltip />
                   <Area type="monotone" dataKey="views" stroke="#ff7a50" fillOpacity={1} fill="url(#colorViews)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <p className="muted" style={{ marginTop: '20px', textAlign: 'center' }}>Пики на графике означают виральные хиты, которые вышли за рамки обычной аудитории.</p>
           </section>
 
-          {/* СПИСКИ АУДИТА */}
           <section className="list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginTop: '40px' }}>
-            <BulletList title="Преимущества канала" items={result.analysis.channelAudit.strengths} />
-            <BulletList title="Критические недочеты" items={result.analysis.channelAudit.weaknesses} />
-            <BulletList title="Форматы, которые 'залетают'" items={result.analysis.contentPatterns.winningFormats} />
-            <BulletList title="Паттерны, тянущие вниз" items={result.analysis.contentPatterns.underperformingPatterns} />
+            <BulletList title="Преимущества" items={result.analysis.channelAudit.strengths} />
+            <BulletList title="Недочеты" items={result.analysis.channelAudit.weaknesses} />
+            <BulletList title="Winning Formats" items={result.analysis.contentPatterns.winningFormats} />
+            <BulletList title="Underperforming" items={result.analysis.contentPatterns.underperformingPatterns} />
           </section>
 
-          {/* ТОП ВИДЕО */}
           {topVideo && (
             <section className="spotlight" style={{ marginTop: '40px' }}>
               <div className="spotlight-main">
-                <span className="eyebrow">Самое популярное видео</span>
-                <h3 style={{ fontSize: '28px', margin: '15px 0' }}>{topVideo.title}</h3>
-                <a className="inline-link" href={topVideo.url} target="_blank" rel="noreferrer" style={{ fontSize: '18px' }}>Открыть видео на YouTube ↗</a>
+                <span className="eyebrow">Топ видео</span><h3>{topVideo.title}</h3>
+                <a className="inline-link" href={topVideo.url} target="_blank" rel="noreferrer">Смотреть на YouTube ↗</a>
               </div>
               <div className="spotlight-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-                <BulletList title="Почему это стало хитом" items={result.analysis.topVideoBreakdown.whyItWorked} />
-                <BulletList title="Элементы для повторения" items={result.analysis.topVideoBreakdown.replicableElements} />
+                <BulletList title="Почему выстрелило" items={result.analysis.topVideoBreakdown.whyItWorked} />
+                <BulletList title="Что повторить" items={result.analysis.topVideoBreakdown.replicableElements} />
               </div>
             </section>
           )}
 
-          {/* КОНКУРЕНТЫ */}
           <section className="panel" style={{ marginTop: '40px', padding: '40px' }}>
-            <h3>Конкурентная разведка — что смотрят прямо сейчас</h3>
+            <h3>Конкурентная разведка</h3>
             <div className="competitor-grid" style={{ marginTop: '30px' }}>
               {result.analysis.competitorTakeaways.videos.map((v) => (
                 <article key={v.videoId} className="competitor-card" style={{ padding: '25px', background: '#fff', borderRadius: '15px', border: '1px solid #eee' }}>
-                  <a href={v.url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: '#ff7a50', fontWeight: 'bold', fontSize: '19px', display: 'block', marginBottom: '10px' }}>{v.title} ↗</a>
-                  <p className="muted" style={{ marginBottom: '20px' }}>Канал: {v.channelTitle}</p>
-                  <div style={{ fontSize: '15px', lineHeight: '1.6', color: '#444' }}>
-                    <strong>Секрет успеха:</strong>
-                    <ul style={{ paddingLeft: '20px', margin: '10px 0 20px' }}>{v.whyItPopped.map((i, idx) => <li key={idx}>{i}</li>)}</ul>
-                    <strong>Что адаптировать:</strong>
+                  <a href={v.url} target="_blank" rel="noreferrer" style={{ color: '#ff7a50', fontWeight: 'bold', fontSize: '19px' }}>{v.title} ↗</a>
+                  <p className="muted">Канал: {v.channelTitle}</p>
+                  <div style={{ marginTop: '15px' }}>
+                    <strong>Почему залетело:</strong>
+                    <ul style={{ paddingLeft: '20px' }}>{v.whyItPopped.map((i, idx) => <li key={idx}>{i}</li>)}</ul>
+                    <strong>Адаптация:</strong>
                     <ul style={{ paddingLeft: '20px' }}>{v.ideasToAdapt.map((i, idx) => <li key={idx}>{i}</li>)}</ul>
                   </div>
                 </article>
@@ -300,38 +289,33 @@ export default function HomePage() {
             </div>
           </section>
 
-          {/* ПЛАН РОСТА + ДЕТАЛИЗАЦИЯ */}
           <section className="panel" style={{ marginTop: '40px', padding: '40px' }}>
-            <span className="eyebrow">Стратегия 30 дней</span>
-            <h3>Тактическая дорожная карта</h3>
+            <h3>План на 30 дней</h3>
             <div className="list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '30px', marginTop: '30px' }}>
-              <BulletList title="Первые 7 дней" items={result.analysis.actionPlan.next7Days} />
-              <BulletList title="До 30 дней" items={result.analysis.actionPlan.next30Days} />
+              <BulletList title="7 дней" items={result.analysis.actionPlan.next7Days} />
+              <BulletList title="30 дней" items={result.analysis.actionPlan.next30Days} />
               <BulletList title="Эксперименты" items={result.analysis.actionPlan.experimentIdeas} />
             </div>
-            
             <div style={{ textAlign: 'center', marginTop: '40px' }}>
-              <button className="secondary-button" onClick={handlePlanDetails} disabled={planLoading} style={{ padding: '15px 50px', fontSize: '17px' }}>
+              <button className="secondary-button" onClick={handlePlanDetails} disabled={planLoading} style={{ padding: '15px 50px' }}>
                 {planLoading ? "AI прорабатывает детали..." : "Раскрыть подробный пошаговый план"}
               </button>
             </div>
-
             {planDetails && (
               <div className="details-panel" style={{ marginTop: '50px', background: '#f5f7fa', padding: '40px', borderRadius: '20px' }}>
-                <h3 style={{ marginBottom: '30px' }}>Инструкция по реализации (Фазы 1-4)</h3>
+                <h3>Инструкция (Фазы 1-4)</h3>
                 <div className="phase-list" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px', marginBottom: '40px' }}>
-                  {planDetails.details.phases.map((p, i) => (
-                    <article className="phase-card" key={i} style={{ padding: '25px', background: '#fff', borderRadius: '15px', position: 'relative' }}>
-                      <span className="phase-number" style={{ position: 'absolute', top: '15px', right: '15px', fontSize: '24px', fontWeight: 'bold', color: '#ff7a50', opacity: 0.2 }}>{i+1}</span>
-                      <h4 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>{p.title}</h4>
-                      <p style={{ fontSize: '14.5px', color: '#555', marginBottom: '15px' }}>{p.objective}</p>
-                      <strong style={{ fontSize: '14px', color: '#ff7a50' }}>Результат: {p.deliverable}</strong>
+                  {planDetails?.details?.phases?.map((p, i) => (
+                    <article className="phase-card" key={i} style={{ padding: '25px', background: '#fff', borderRadius: '15px' }}>
+                      <h4 style={{ color: '#ff7a50' }}>{i+1}. {p.title}</h4>
+                      <p style={{ fontSize: '14px' }}>{p.objective}</p>
+                      <strong style={{ fontSize: '13px' }}>Результат: {p.deliverable}</strong>
                     </article>
                   ))}
                 </div>
                 <div className="list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-                   <BulletList title="Чек-лист выполнения" items={planDetails.details.checklist} />
-                   <BulletList title="Метрики контроля" items={planDetails.details.metricsToWatch} />
+                   <BulletList title="Чек-лист" items={planDetails?.details?.checklist} />
+                   <BulletList title="Метрики" items={planDetails?.details?.metricsToWatch} />
                 </div>
               </div>
             )}
