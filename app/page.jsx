@@ -301,6 +301,8 @@ export default function HomePage() {
         </>
       )}
 
+    
+
       {/* УСТАНОВКА РАСШИРЕНИЯ */}
       <section id="extension" className="panel" style={{ marginTop: '80px', background: '#111', color: '#fff', padding: '50px', textAlign: 'center' }}>
         <h2 style={{ color: '#ff7a50', fontSize: '32px' }}>Установите расширение Pulse</h2>
@@ -312,7 +314,8 @@ export default function HomePage() {
         </div>
         <div style={{ padding: '20px', border: '1px dashed #444', borderRadius: '10px' }}>
           <p>Ваш персональный код для расширения:</p>
-          <code style={{ fontSize: '24px', color: '#ff7a50' }}>{user.code}</code>
+          {/* ВОТ ЗДЕСЬ ИСПРАВЛЕНИЕ: добавил знак вопроса user?.code */}
+          <code style={{ fontSize: '24px', color: '#ff7a50' }}>{user?.code || "Код не найден"}</code>
         </div>
       </section>
     </main>
