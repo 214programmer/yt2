@@ -160,13 +160,33 @@ export default function HomePage() {
     }, 2500);
   };
 
-  async function handleSubmit(e) {
-    e.preventDefault(); setLoading(true); setResult(null); setPlanDetails(null);
+async function handleSubmit(e) {
+    e.preventDefault(); setLoading(true); setError(""); setResult(null);
     try {
-      const res = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channelUrl, accessCode: user.code }) });
+      const res = await fetch("/api/analyze", { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" }, 
+        body: JSON.stringify({ channelUrl, accessCode: user.code }) 
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+      
       setResult(data);
+      
+      // Обновление профиля в Firebase
+      try {
+        await updateDoc(doc(db, "users", user.code), { 
+          lastStats: { 
+            subs: formatNumber(data.channel.subscriberCount), 
+            views: formatNumber(data.channel.viewCount), 
+            title: data.channel.title 
+          } 
+        });
+        console.log("Данные успешно сохранены в Firebase");
+      } catch (dbErr) {
+        console.error("Ошибка сохранения в базу:", dbErr);
+      }
+      
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   }
 
